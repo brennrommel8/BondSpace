@@ -38,10 +38,12 @@ export const getAuthToken = (): string | undefined => {
     
     // If not in cookie, try localStorage
     if (!token) {
-      token = localStorage.getItem(TOKEN_LOCAL_STORAGE_KEY);
+      const localStorageToken = localStorage.getItem(TOKEN_LOCAL_STORAGE_KEY);
+      // Convert null to undefined to match expected return type
+      token = localStorageToken !== null ? localStorageToken : undefined;
     }
     
-    return token || undefined;
+    return token;
   } catch (error) {
     console.error('Error retrieving auth token:', error);
     return undefined;
