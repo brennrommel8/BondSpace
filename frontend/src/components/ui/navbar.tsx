@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Search, Home, Users, Bell, MessageSquare, Plus, Menu, X } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { AvatarDropdown } from "./avatar-dropdown"
 import { useSearchUsers } from "@/hooks/useSearchUsers"
@@ -8,9 +8,11 @@ import { UserSearchResult } from "@/api/searchApi"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreatePostDialog } from "./create-post-dialog"
 import { ChatDropdown } from "./chat-dropdown"
+import { getProfileImageUrl } from "@/utils/profileImageUtils"
 
 const Navbar = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -72,6 +74,17 @@ const Navbar = () => {
     setIsChatOpen(!isChatOpen)
   }
 
+  // Handle logo click - refresh current page or go to home if on different page
+  const handleLogoClick = () => {
+    if (location.pathname === '/UserAccount') {
+      // If already on home page, refresh the page
+      window.location.reload()
+    } else {
+      // Otherwise navigate to home
+      navigate('/UserAccount')
+    }
+  }
+
   return (
     <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
       <div className="max-w-7xl mx-auto px-4">
@@ -79,7 +92,7 @@ const Navbar = () => {
           {/* Left Section - Logo and Search */}
           <div className="flex items-center space-x-2">
             {/* Logo */}
-            <div className="relative w-10 h-10 cursor-pointer" onClick={() => navigate('/UserAccount')}>
+            <div className="relative w-10 h-10 cursor-pointer" onClick={handleLogoClick}>
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl transform rotate-45"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-sm">
@@ -116,7 +129,7 @@ const Navbar = () => {
                           onClick={() => handleUserClick(user.username)}
                         >
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={user.profilePicture} />
+                            <AvatarImage src={getProfileImageUrl(user.profilePicture)} />
                             <AvatarFallback>
                               {user.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
