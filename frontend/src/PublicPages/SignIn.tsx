@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Users, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Users, Eye, EyeOff, CheckCircle } from "lucide-react"
 import { PageTransition } from "@/components/ui/page-transition"
 import { useState, useEffect } from "react"
 import { authApi } from "@/api/authApi"
@@ -17,16 +17,30 @@ const SignIn = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showLoading, setShowLoading] = useState(false)
   const [loadingOpacity, setLoadingOpacity] = useState(0)
+  const [loadingStep, setLoadingStep] = useState(1)
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     if (showLoading) {
       // Fade in the loading animation
       setLoadingOpacity(1)
-      // Set timeout for navigation after 3 seconds
+      
+      // Simulate step progression for loading animation
       timeoutId = setTimeout(() => {
-        navigate("/UserAccount")
-      }, 3000)
+        setLoadingStep(2)
+        
+        const step3TimeoutId = setTimeout(() => {
+          setLoadingStep(3)
+          
+          const navigationTimeoutId = setTimeout(() => {
+            navigate("/UserAccount")
+          }, 800)
+          
+          return () => clearTimeout(navigationTimeoutId)
+        }, 1000)
+        
+        return () => clearTimeout(step3TimeoutId)
+      }, 1200)
     }
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
@@ -184,22 +198,46 @@ const SignIn = () => {
           </div>
         </div>
 
-        {/* Loading Video Overlay */}
+        {/* Loading Animation Overlay */}
         {showLoading && (
           <div 
-            className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm transition-opacity duration-300"
+            className="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm transition-opacity duration-300 z-50"
             style={{ opacity: loadingOpacity }}
           >
-            <div className="text-center">
-              <div className="w-40 h-40 mx-auto">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  className="w-full h-full"
-                >
-                  <source src="/loading.webm" type="video/webm" />
-                </video>
+            <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-sm mx-auto">
+              {/* Step 1: Authentication */}
+              <div className={`transition-all duration-300 ${loadingStep > 1 ? 'opacity-50' : ''}`}>
+                <div className={`w-16 h-16 mx-auto mb-3 ${loadingStep === 1 ? 'animate-spin' : ''}`}>
+                  <div className="h-full w-full rounded-full border-4 border-emerald-100 border-t-emerald-500"></div>
+                </div>
+                <p className="text-emerald-800 font-medium">Authenticating</p>
+                <p className="text-sm text-emerald-600">Verifying your credentials...</p>
+              </div>
+              
+              {/* Step 2: Loading Profile */}
+              <div className={`mt-6 transition-all duration-300 ${loadingStep < 2 ? 'opacity-0' : ''} ${loadingStep > 2 ? 'opacity-50' : ''}`}>
+                <div className={`w-16 h-16 mx-auto mb-3 ${loadingStep === 2 ? 'animate-spin' : ''}`}>
+                  <div className="h-full w-full rounded-full border-4 border-emerald-100 border-t-emerald-500"></div>
+                </div>
+                <p className="text-emerald-800 font-medium">Loading Profile</p>
+                <p className="text-sm text-emerald-600">Getting your information...</p>
+              </div>
+              
+              {/* Step 3: Success */}
+              <div className={`mt-6 transition-all duration-300 ${loadingStep < 3 ? 'opacity-0' : ''}`}>
+                <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center text-emerald-500">
+                  <CheckCircle className="h-12 w-12" />
+                </div>
+                <p className="text-emerald-800 font-medium">Welcome Back!</p>
+                <p className="text-sm text-emerald-600">Redirecting to your account...</p>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mt-8 h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500 ease-in-out" 
+                  style={{ width: `${(loadingStep / 3) * 100}%` }}
+                ></div>
               </div>
             </div>
           </div>

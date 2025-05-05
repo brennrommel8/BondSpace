@@ -109,9 +109,9 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
   const friendsList = operationsStatus?.friends?.list || [];
   const hasFriends = friendsList.length > 0;
 
-  // Determine dropdown position and size based on mobile or desktop
+  // Update dropdown classes to ensure proper sizing on all mobile devices
   const dropdownClasses = isMobile 
-    ? "fixed left-0 right-0 top-14 max-h-[70vh] overflow-y-auto z-50 chat-dropdown-content" 
+    ? "fixed left-0 right-0 top-14 max-h-[70vh] overflow-y-auto z-50 chat-dropdown-content w-full" 
     : "absolute right-0 w-80 mt-2 max-h-[500px] overflow-y-auto z-50 chat-dropdown-content";
 
   // Handle tab changes
@@ -186,18 +186,18 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                       createOrOpenConversation(friend._id);
                     }}
                   >
-                    <Avatar className="h-10 w-10 mr-3">
+                    <Avatar className="h-10 w-10 flex-shrink-0 mr-2">
                       <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
                       <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 mr-3">
                       <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
                       <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
                     </div>
                     <Button 
                       size="sm" 
                       variant="ghost" 
-                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50"
+                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         createOrOpenConversation(friend._id);
@@ -208,12 +208,12 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center p-6 text-center h-40">
-                  <p className="text-sm text-gray-600 mb-2">No friends yet</p>
+                <div className="flex flex-col items-center justify-center p-6 text-center h-40 space-y-3">
+                  <p className="text-sm text-gray-600">No friends yet</p>
                   <Button 
                     onClick={() => navigateWithoutClosing('/friends')}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    size="sm" 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white w-full max-w-[200px]"
+                    size="sm"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
                     Find Friends
@@ -273,18 +273,18 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                       createOrOpenConversation(friend._id);
                     }}
                   >
-                    <Avatar className="h-10 w-10 mr-3">
+                    <Avatar className="h-10 w-10 flex-shrink-0 mr-2">
                       <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
                       <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 mr-3">
                       <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
                       <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
                     </div>
                     <Button 
                       size="sm" 
                       variant="ghost" 
-                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50"
+                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         createOrOpenConversation(friend._id);
@@ -295,11 +295,11 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center p-6 text-center h-40">
-                  <p className="text-sm text-gray-600 mb-2">No friends yet</p>
+                <div className="flex flex-col items-center justify-center p-6 text-center h-40 space-y-3">
+                  <p className="text-sm text-gray-600">No friends yet</p>
                   <Button 
                     onClick={() => navigateWithoutClosing('/friends')}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white w-full max-w-[200px]"
                     size="sm"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
