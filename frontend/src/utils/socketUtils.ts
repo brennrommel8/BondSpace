@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import Cookies from 'js-cookie';
+
 import { getAuthToken } from './authUtils';
 import { Message } from '@/api/chatApi';
 import { API_ENDPOINTS } from '@/config/api';
