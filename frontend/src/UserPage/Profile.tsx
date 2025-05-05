@@ -93,9 +93,16 @@ const Profile = () => {
       const response = await profileApi.uploadProfilePicture(file)
       console.log('Upload response:', response) // Debug log
       
-      if (response.success && response.user) {
-        console.log('Updated user profile picture:', response.user.profilePicture) // Debug log
-        setUser(response.user)
+      if (response.success && response.data) {
+        console.log('Updated profile picture URL:', response.data.url) // Debug log
+        // Update user with new profile picture URL
+        if (user) {
+          const updatedUser = {
+            ...user,
+            profilePicture: response.data.url
+          };
+          setUser(updatedUser);
+        }
         toast.success("Profile picture updated successfully")
       } else {
         toast.error(response.message || "Failed to update profile picture")
