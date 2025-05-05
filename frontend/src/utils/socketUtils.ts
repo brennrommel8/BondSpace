@@ -89,7 +89,8 @@ export const initializeSocket = (): Socket | null => {
       // Create socket with exact format expected by the backend
       socket = io(API_ENDPOINTS.SOCKET, {
         ...SOCKET_OPTIONS,
-        auth: { token } // Backend looks for socket.handshake.auth.token
+        auth: { token }, // Backend looks for socket.handshake.auth.token
+        query: { token } // Some backends look for token in query params
       });
       
       // Set up event listeners
@@ -101,7 +102,8 @@ export const initializeSocket = (): Socket | null => {
         // Log socket info for debugging
         console.log('Socket connection details:', {
           id: socket?.id,
-          connected: socket?.connected
+          connected: socket?.connected,
+          url: API_ENDPOINTS.SOCKET
         });
         
         // Request a list of online users (with null check)
@@ -118,6 +120,11 @@ export const initializeSocket = (): Socket | null => {
           path: SOCKET_OPTIONS.path,
           token: 'exists: ' + (!!getAuthToken())
         });
+        
+        // Check if this is a 401 error (unauthorized)
+        if (err.message.includes('401') || err.message.includes('unauthorized')) {
+          console.warn('Socket authentication failed. The token may be invalid or expired.');
+        }
         
         // Check if this is a 404 error which means Socket.IO is not available on the server
         if (err.message.includes('404')) {
@@ -355,21 +362,26 @@ export const refreshSocketConnection = (token?: string): void => {
   // If backend is not available, don't try to reconnect
   if (shouldSkipSocketIO() && !token) return;
   
+  console.log('Refreshing socket connection, token provided:', !!token);
+  
   // If a new token is provided, we'll attempt to connect even if backend was unavailable
   if (token) {
     isConnectivityAvailable = true; // Reset this flag when we have a new token
     saveSocketAvailability(true);
-    Cookies.set('token', token, { expires: 7 });
-    localStorage.setItem('token', token);
+    
+    // We don't need to manually set cookies/localStorage here
+    // This is handled by authUtils.setAuthToken
   }
   
   // Disconnect existing socket
   if (socket) {
+    console.log('Disconnecting existing socket for refresh');
     socket.disconnect();
     socket = null;
   }
   
   // Try to initialize a new connection
+  console.log('Initializing new socket connection after refresh');
   initializeSocket();
 };
 

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
+const API_URL = 'https://socmed-backend-e8wf.onrender.com/api'
 
 export interface FriendResponse {
   success: boolean

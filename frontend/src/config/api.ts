@@ -4,7 +4,7 @@
  */
 
 // Base API URL - can be changed based on environment
-export const API_BASE_URL = 'https://socmed-backend-8q7a.onrender.com';
+export const API_BASE_URL = 'https://socmed-backend-e8wf.onrender.com'
 
 // API endpoints
 export const API_ENDPOINTS = {

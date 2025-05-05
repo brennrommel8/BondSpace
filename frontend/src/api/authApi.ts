@@ -1,6 +1,6 @@
-import axios from 'axios'
-
-const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
+import api from '@/config/axios';
+import {  API_ENDPOINTS } from '@/config/api';
+import axios from 'axios';
 
 export interface SignUpData {
   name: string
@@ -72,9 +72,7 @@ export const authApi = {
   signUp: async (data: SignUpData): Promise<SignUpResponse> => {
     try {
       console.log('Sending signup request with data:', data)
-      const response = await axios.post<SignUpResponse>(`${API_URL}/auth/register`, data, {
-        withCredentials: true // Important for cookies
-      })
+      const response = await api.post<SignUpResponse>(API_ENDPOINTS.AUTH.REGISTER, data)
       console.log('Signup response:', response.data)
       return response.data
     } catch (error) {
@@ -94,9 +92,7 @@ export const authApi = {
 
   login: async (credentials: LoginInput): Promise<LoginResponse> => {
     try {
-      const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, credentials, {
-        withCredentials: true // Important for cookies
-      })
+      const response = await api.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials)
       return response.data
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -108,9 +104,7 @@ export const authApi = {
 
   logout: async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/logout`, {
-        withCredentials: true
-      })
+      const response = await api.get(API_ENDPOINTS.AUTH.LOGOUT)
       return response.data
     } catch (error) {
       throw error
@@ -119,18 +113,8 @@ export const authApi = {
 
   getMe: async (): Promise<ApiResponse<UserProfile>> => {
     try {
-      // Get token from both cookie and localStorage to ensure we have it
-      const token = localStorage.getItem('token') || document.cookie.replace(/(?:(?:^|.*;\s*)token\s*\=\s*([^;]*).*$)|^.*$/, "$1");
-      
-      console.log('Auth token used for getMe request:', token ? 'Present' : 'Missing');
-      
-      const response = await axios.get<ApiResponse<UserProfile>>(`${API_URL}/auth/me`, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      });
+      console.log('Fetching current user profile');
+      const response = await api.get<ApiResponse<UserProfile>>(`${API_ENDPOINTS.API}/auth/me`);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -144,18 +128,12 @@ export const authApi = {
   updateProfile: async (data: UpdateProfileInput) => {
     try {
       console.log('Sending update request with data:', data)
-      const response = await axios.put(
-        `${API_URL}/auth/profile`,
+      const response = await api.put(
+        `${API_ENDPOINTS.API}/auth/profile`,
         {
           name: data.name,
           username: data.username,
           email: data.email
-        },
-        { 
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json'
-          }
         }
       );
       console.log('Update response:', response.data)
@@ -173,18 +151,12 @@ export const authApi = {
   changePassword: async (data: ChangePasswordInput) => {
     try {
       console.log('Sending change password request with data:', data)
-      const response = await axios.put(
-        `${API_URL}/auth/password`,
+      const response = await api.put(
+        `${API_ENDPOINTS.API}/auth/password`,
         {
           currentPassword: data.currentPassword,
           newPassword: data.newPassword,
           confirmNewPassword: data.confirmNewPassword
-        },
-        { 
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json'
-          }
         }
       );
       console.log('Change password response:', response.data)

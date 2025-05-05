@@ -1,4 +1,5 @@
-import axios from 'axios';
+
+import api from '@/config/axios';
 import { API_ENDPOINTS } from '@/config/api';
 
 export interface IUser {
@@ -53,16 +54,10 @@ export const chatApi = {
   createOrGetConversation: async (participantId: string): Promise<ConversationResponse> => {
     try {
       console.log('Creating/getting conversation with participant:', participantId);
-      // Using axios directly with withCredentials to ensure cookies are sent
-      const response = await axios.post<ConversationResponse>(
+      // Using configured axios instance
+      const response = await api.post<ConversationResponse>(
         API_ENDPOINTS.CHAT.CONVERSATIONS,
-        { participantId },
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        { participantId }
       );
       console.log('Create/get conversation response:', response.data);
       return response.data;
@@ -83,13 +78,8 @@ export const chatApi = {
   getConversations: async (): Promise<{ success: boolean; conversations?: Conversation[]; message?: string }> => {
     try {
       console.log('Fetching conversations...');
-      // Using axios directly with withCredentials to ensure cookies are sent
-      const response = await axios.get(API_ENDPOINTS.CHAT.CONVERSATIONS, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      // Using configured axios instance
+      const response = await api.get(API_ENDPOINTS.CHAT.CONVERSATIONS);
       console.log('Get conversations response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -110,13 +100,8 @@ export const chatApi = {
   getMessages: async (conversationId: string): Promise<{ success: boolean; messages?: Message[]; message?: string }> => {
     try {
       console.log('Fetching messages for conversation:', conversationId);
-      // Using axios directly with withCredentials to ensure cookies are sent
-      const response = await axios.get(API_ENDPOINTS.CHAT.MESSAGES_BY_CONVERSATION(conversationId), {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      // Using configured axios instance
+      const response = await api.get(API_ENDPOINTS.CHAT.MESSAGES_BY_CONVERSATION(conversationId));
       console.log('Get messages response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -184,12 +169,11 @@ export const chatApi = {
         });
       }
       
-      // Using axios directly with withCredentials to ensure cookies are sent
-      const response = await axios.post(
+      // We need a custom config for the FormData content type
+      const response = await api.post(
         API_ENDPOINTS.CHAT.MESSAGES, 
         formData,
         {
-          withCredentials: true,
           headers: {
             'Content-Type': 'multipart/form-data',
           }
@@ -216,12 +200,7 @@ export const chatApi = {
   deleteMessage: async (messageId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Deleting message:', messageId);
-      const response = await axios.delete(API_ENDPOINTS.CHAT.DELETE_MESSAGE(messageId), {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await api.delete(API_ENDPOINTS.CHAT.DELETE_MESSAGE(messageId));
       console.log('Delete message response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -242,16 +221,7 @@ export const chatApi = {
   markMessagesAsRead: async (conversationId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Marking messages as read in conversation:', conversationId);
-      const response = await axios.patch(
-        API_ENDPOINTS.CHAT.READ_MESSAGES(conversationId), 
-        {}, // Empty body
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
-      );
+      const response = await api.patch(API_ENDPOINTS.CHAT.READ_MESSAGES(conversationId), {});
       console.log('Mark messages as read response:', response.data);
       return response.data;
     } catch (error: any) {
