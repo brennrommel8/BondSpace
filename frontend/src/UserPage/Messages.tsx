@@ -114,12 +114,12 @@ const Messages: React.FC = () => {
   }
 
   // If no conversation is selected and we have friends, show a friends list
-  if (!conversationId && operationsStatus?.friends?.list?.length > 0) {
+  if (!conversationId && operationsStatus?.friends?.list && operationsStatus.friends.list.length > 0) {
     return (
       <div className="max-w-4xl mx-auto p-6 h-[calc(100vh-3.5rem)] bg-white rounded-lg shadow-sm overflow-auto">
         <h2 className="text-2xl font-bold mb-6">Start a Conversation</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {operationsStatus.friends.list.map(friend => (
+          {operationsStatus?.friends?.list?.map(friend => (
             <div 
               key={friend._id} 
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"

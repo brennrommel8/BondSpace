@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getUserProfile } from '@/api/searchApi'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -71,7 +71,6 @@ const Visit = () => {
   const [profile, setProfile] = useState<ExtendedUserProfileResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [messagingLoading, setMessagingLoading] = useState(false)
-  const navigate = useNavigate()
   
   // Get friend store state and actions
   const {

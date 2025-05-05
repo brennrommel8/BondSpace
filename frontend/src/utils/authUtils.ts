@@ -29,9 +29,9 @@ export const setAuthToken = (token: string): void => {
 
 /**
  * Get the authentication token from available sources
- * @returns Token string or null if not found
+ * @returns Token string or undefined if not found
  */
-export const getAuthToken = (): string | null => {
+export const getAuthToken = (): string | undefined => {
   try {
     // Try to get from cookie first
     let token = Cookies.get(TOKEN_COOKIE_KEY);
@@ -41,10 +41,10 @@ export const getAuthToken = (): string | null => {
       token = localStorage.getItem(TOKEN_LOCAL_STORAGE_KEY);
     }
     
-    return token || null;
+    return token || undefined;
   } catch (error) {
     console.error('Error retrieving auth token:', error);
-    return null;
+    return undefined;
   }
 };
 

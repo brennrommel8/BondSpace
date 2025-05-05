@@ -1,4 +1,3 @@
-import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ReactionType } from "@/api/postApi";
 
