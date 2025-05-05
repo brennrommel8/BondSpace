@@ -2,7 +2,7 @@ import axios from 'axios'
 import api from '@/config/axios'
 
 // Hardcoded API URL
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api';
 
 // Store failed user IDs temporarily
 let tempFailedUserIds: string[] = [];

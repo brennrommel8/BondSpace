@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { authApi } from '@/api/authApi';
 import { toast } from 'sonner';
+import { initializeSocket, refreshSocketConnection } from '@/utils/socketUtils';
 
 export const useAuth = () => {
   const { user, setUser } = useUserStore();
@@ -26,6 +27,10 @@ export const useAuth = () => {
       if (response.success && response.user) {
         console.log('User is authenticated:', response.user);
         setUser(response.user);
+        
+        // Initialize the socket connection
+        console.log('Initializing socket connection after auth check');
+        initializeSocket();
       } else {
         console.log('No authenticated user found');
         setUser(null);
@@ -61,6 +66,14 @@ export const useAuth = () => {
       if (response.success && response.user) {
         setUser(response.user);
         setAuthChecked(true);
+        
+        // Initialize socket connection after successful login
+        console.log('Initializing socket connection after login');
+        setTimeout(() => {
+          // Small delay to ensure token is properly stored before attempting socket connection
+          refreshSocketConnection();
+        }, 500);
+        
         toast.success('Logged in successfully');
         return true;
       } else {

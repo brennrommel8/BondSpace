@@ -2,7 +2,6 @@ import { io, Socket } from 'socket.io-client';
 
 import { getAuthToken } from './authUtils';
 import { Message } from '@/api/chatApi';
-import { API_ENDPOINTS } from '@/config/api';
 
 // Socket connection options
 const SOCKET_OPTIONS = {
@@ -13,8 +12,11 @@ const SOCKET_OPTIONS = {
   path: '/socket.io',           // Socket.IO default path
   forceNew: true,               // Force a new connection on each attempt
   withCredentials: true,        // Send cookies for cross-site requests
-  transports: ['websocket']     // Try only websocket to avoid polling issues
+  transports: ['websocket', 'polling']  // Try websocket first, then fall back to polling
 };
+
+// Hardcoded socket URL that matches the API URL
+const SOCKET_URL = 'https://socmed-backend-8q7a.onrender.com';
 
 // Socket instance
 let socket: Socket | null = null;
@@ -83,11 +85,11 @@ export const initializeSocket = (): Socket | null => {
     }
     
     // Create new socket connection with auth token
-    console.log('Creating new socket connection');
+    console.log('Creating new socket connection to:', SOCKET_URL);
     
     try {
       // Create socket with exact format expected by the backend
-      socket = io(API_ENDPOINTS.SOCKET, {
+      socket = io(SOCKET_URL, {
         ...SOCKET_OPTIONS,
         auth: { token }, // Backend looks for socket.handshake.auth.token
         query: { token } // Some backends look for token in query params
@@ -95,7 +97,7 @@ export const initializeSocket = (): Socket | null => {
       
       // Set up event listeners
       socket.on('connect', () => {
-        console.log('Socket connected successfully');
+        console.log('Socket connected successfully!');
         isConnectivityAvailable = true;
         saveSocketAvailability(true);
         
@@ -103,7 +105,7 @@ export const initializeSocket = (): Socket | null => {
         console.log('Socket connection details:', {
           id: socket?.id,
           connected: socket?.connected,
-          url: API_ENDPOINTS.SOCKET
+          url: SOCKET_URL
         });
         
         // Request a list of online users (with null check)
@@ -116,7 +118,7 @@ export const initializeSocket = (): Socket | null => {
         // Less verbose error logging
         console.error('Socket connection error:', err.message);
         console.log('Socket connection details:', {
-          url: API_ENDPOINTS.SOCKET,
+          url: SOCKET_URL,
           path: SOCKET_OPTIONS.path,
           token: 'exists: ' + (!!getAuthToken())
         });
@@ -251,12 +253,35 @@ export const sendPrivateMessage = (
 ): void => {
   const s = getSafeSocket();
   if (s) {
+    console.log('Sending private message via socket:', {
+      recipientId,
+      conversationId,
+      messageLength: message?.length || 0,
+      hasMessageObj: !!messageObj
+    });
+    
+    // Make sure socket is connected
+    if (!s.connected) {
+      console.log('Socket not connected, attempting to connect...');
+      s.connect();
+    }
+    
     s.emit('privateMessage', {
       recipientId,
       message,
       conversationId,
       messageObj
     });
+    
+    // Also emit a backup event for servers that might use a different event name
+    s.emit('message', {
+      to: recipientId,
+      content: message,
+      conversationId,
+      messageData: messageObj
+    });
+  } else {
+    console.error('Cannot send private message: Socket connection not available');
   }
 };
 

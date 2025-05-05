@@ -1,1 +1,1 @@
-export const API_URL = 'https://socmed-backend-e8wf.onrender.com'
+export const API_URL = 'https://socmed-backend-8q7a.onrender.com'

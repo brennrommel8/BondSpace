@@ -2,7 +2,7 @@ import api from '@/config/axios';
 import axios from 'axios';
 
 // Hardcoded API URL
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api';
 
 export interface SignUpData {
   name: string

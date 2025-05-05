@@ -1,7 +1,7 @@
 import axios from 'axios'
 import api from '@/config/axios';
 
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api'
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
 
 export interface FriendResponse {
   success: boolean
@@ -96,7 +96,7 @@ export const friendApi = {
       }
 
       console.log('Sending friend request to userId:', userId)
-      const response = await axios.post<FriendResponse>(
+      const response = await api.post<FriendResponse>(
         `${API_URL}/friends/friend-requests`,
         { userId },
         {
@@ -142,7 +142,7 @@ export const friendApi = {
       }
 
       console.log('Accepting friend request from userId:', userId)
-      const response = await axios.post<FriendResponse>(
+      const response = await api.post<FriendResponse>(
         `${API_URL}/friends/friend-requests/${userId}`,
         { userId },
         {
@@ -176,7 +176,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
   try {
     if (!userId) throw new Error('userId is required');
 
-    const response = await axios.delete<FriendResponse>(
+    const response = await api.delete<FriendResponse>(
       `${API_URL}/friends/friend-requests/${userId}`,
       { withCredentials: true }
     );
@@ -217,7 +217,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
       console.log('Remove friend - userId:', userId)
       console.log('Remove friend - URL:', `${API_URL}/friends/${userId}`)
       
-      const response = await axios.delete<FriendResponse>(
+      const response = await api.delete<FriendResponse>(
         `${API_URL}/friends/${userId}`,
         {
           withCredentials: true,
@@ -260,7 +260,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
   getFriendRequests: async (): Promise<FriendResponse & { data: Friend[] }> => {
     try {
       console.log('Fetching friend requests')
-      const response = await axios.get<FriendResponse & { data: Friend[] }>(
+      const response = await api.get<FriendResponse & { data: Friend[] }>(
         `${API_URL}/friends/friend-requests`,
         {
           withCredentials: true,
@@ -288,7 +288,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
   getFriends: async (): Promise<FriendResponse & { data: Friend[] }> => {
     try {
       console.log('Fetching friends')
-      const response = await axios.get<FriendResponse & { data: Friend[] }>(
+      const response = await api.get<FriendResponse & { data: Friend[] }>(
         `${API_URL}/friends`,
         {
           withCredentials: true,

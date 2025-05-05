@@ -1,7 +1,7 @@
 import api from '@/config/axios';
 
 // Hardcoded API URL
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api';
 
 export interface IUser {
   _id: string;

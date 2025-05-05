@@ -4,7 +4,7 @@
  */
 
 // Base API URL - hardcoded
-export const API_BASE_URL = 'https://socmed-backend-e8wf.onrender.com';
+export const API_BASE_URL = 'https://socmed-backend-8q7a.onrender.com';
 
 // API endpoints
 export const API_ENDPOINTS = {

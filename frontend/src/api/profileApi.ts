@@ -1,35 +1,45 @@
-import axios from 'axios';
-import { UserProfile } from './authApi';
+import api from '@/config/axios'
+import axios from 'axios'
 
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api'
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
 
 interface ProfilePictureResponse {
   success: boolean;
-  user?: UserProfile;
   message?: string;
+  data?: {
+    url: string;
+    publicId: string;
+  };
 }
 
 interface UpdateVisibilityResponse {
   success: boolean;
   message?: string;
+  data?: {
+    visibility: 'public' | 'friends';
+  };
 }
 
 export const profileApi = {
   uploadProfilePicture: async (file: File): Promise<ProfilePictureResponse> => {
     try {
+      console.log('Uploading profile picture...');
+      
+      // Create form data
       const formData = new FormData();
       formData.append('profilePicture', file);
 
-      const response = await axios.post<ProfilePictureResponse>(
+      const response = await api.post<ProfilePictureResponse>(
         `${API_URL}/profile/upload-profile-picture`,
         formData,
         {
-          withCredentials: true,
           headers: {
             'Content-Type': 'multipart/form-data',
           }
         }
       );
+      
+      console.log('Upload response:', response.data);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -43,17 +53,17 @@ export const profileApi = {
   updatePostVisibility: async (visibility: 'public' | 'friends'): Promise<UpdateVisibilityResponse> => {
     try {
       console.log(`Making API request to update visibility to: ${visibility}`)
-      const response = await axios.put<UpdateVisibilityResponse>(
+      const response = await api.put<UpdateVisibilityResponse>(
         `${API_URL}/users/posts/visibility`,
         { visibility },
         {
-          withCredentials: true,
           headers: {
             'Content-Type': 'application/json',
           }
         }
       );
-      console.log('API response for visibility update:', response.data)
+      
+      console.log('Update visibility response:', response.data);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {

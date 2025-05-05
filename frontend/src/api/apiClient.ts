@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 
 // Create axios instance
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://socmed-backend-e8wf.onrender.com',
+  baseURL: import.meta.env.VITE_API_URL || 'https://socmed-backend-8q7a.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   }
