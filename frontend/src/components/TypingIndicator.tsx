@@ -25,7 +25,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isTyping, username })
   if (!isTyping) return null;
   
   return (
-    <div className="px-4 py-2 text-xs text-gray-500 animate-pulse">
+    <div className="px-4 py-2 text-xs text-emerald-600 animate-pulse">
       <span className="italic">
         {username ? `${username} is typing` : 'Someone is typing'}{dots}
       </span>

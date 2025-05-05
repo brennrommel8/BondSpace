@@ -27,7 +27,7 @@ const reactionIcons: Record<ReactionType, string> = {
 
 // Style map for reaction types
 const reactionStyles: Record<ReactionType, string> = {
-  like: "bg-blue-500 hover:bg-blue-600 text-white",
+  like: "bg-emerald-500 hover:bg-emerald-600 text-white",
   love: "bg-red-500 hover:bg-red-600 text-white", 
   haha: "bg-yellow-500 hover:bg-yellow-600 text-white",
   wow: "bg-yellow-400 hover:bg-yellow-500 text-white",
@@ -102,7 +102,7 @@ export const ReplyReactionButton: React.FC<ReactionButtonProps> = ({
       <Button
         size="sm"
         variant={userReaction ? "default" : "ghost"}
-        className={`py-1 h-7 text-xs ${userReaction ? getButtonVariant() : ""}`}
+        className={`py-1 h-7 text-xs ${userReaction ? getButtonVariant() : "text-emerald-600 hover:bg-emerald-50"}`}
         onMouseEnter={() => setShowReactionPopover(true)}
         onClick={handleLike}
         disabled={isReacting}

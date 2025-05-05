@@ -56,7 +56,7 @@ const Messages: React.FC = () => {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
         <div className="text-center p-8">
-          <div className="w-10 h-10 border-4 border-t-blue-500 border-blue-200 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-10 h-10 border-4 border-t-emerald-500 border-emerald-200 rounded-full animate-spin mx-auto mb-4"></div>
           <p>Checking authentication status...</p>
         </div>
       </div>
@@ -69,8 +69,8 @@ const Messages: React.FC = () => {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
         <div className="text-center p-8 max-w-md">
-          <div className="bg-blue-100 p-3 rounded-full mb-3 inline-block">
-            <LogIn className="h-6 w-6 text-blue-500" />
+          <div className="bg-emerald-100 p-3 rounded-full mb-3 inline-block">
+            <LogIn className="h-6 w-6 text-emerald-500" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Sign in Required</h2>
           <p className="text-gray-600 mb-6">
@@ -78,14 +78,14 @@ const Messages: React.FC = () => {
           </p>
           <div className="space-y-3">
             <Button 
-              className="w-full" 
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" 
               onClick={() => navigate('/SignIn')}
             >
               Sign In
             </Button>
             <Button 
               variant="outline" 
-              className="w-full"
+              className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-50"
               onClick={() => navigate('/SignUp')}
             >
               Create Account
@@ -103,7 +103,7 @@ const Messages: React.FC = () => {
         <div className="text-center p-8">
           <p className="text-red-500">{error}</p>
           <button 
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+            className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
             onClick={() => setError(null)}
           >
             Try Again
@@ -143,7 +143,7 @@ const Messages: React.FC = () => {
                   <p className="text-sm text-gray-500">@{friend.username}</p>
                 </div>
               </div>
-              <Button className="w-full mt-3">
+              <Button className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white">
                 <Users className="mr-2 h-4 w-4" />
                 Start Chat
               </Button>
@@ -159,15 +159,15 @@ const Messages: React.FC = () => {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
         <div className="text-center p-8 max-w-md">
-          <div className="bg-blue-100 p-3 rounded-full mb-3 inline-block">
-            <Users className="h-6 w-6 text-blue-500" />
+          <div className="bg-emerald-100 p-3 rounded-full mb-3 inline-block">
+            <Users className="h-6 w-6 text-emerald-500" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">No Friends Yet</h2>
           <p className="text-gray-600 mb-6">
             Add friends to start conversations with them. Connect with people you know to message them.
           </p>
           <Button 
-            className="w-full" 
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" 
             onClick={() => navigate('/UserAccount')}
           >
             Find Friends

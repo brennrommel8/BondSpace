@@ -18,6 +18,7 @@ const Navbar = () => {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<HTMLDivElement>(null)
+  const mobileChatRef = useRef<HTMLDivElement>(null)
   const { data: searchResults, isLoading } = useSearchUsers(searchQuery)
 
   useEffect(() => {
@@ -28,6 +29,15 @@ const Navbar = () => {
       
       if (chatRef.current && !chatRef.current.contains(event.target as Node)) {
         setIsChatOpen(false)
+      }
+      
+      if (mobileChatRef.current && !mobileChatRef.current.contains(event.target as Node)) {
+        // Don't close mobile menu when clicking inside chat dropdown
+        if (!event.composedPath().some(el => 
+          el instanceof HTMLElement && el.classList.contains('chat-dropdown-content')
+        )) {
+          setIsChatOpen(false)
+        }
       }
     }
 
@@ -54,6 +64,12 @@ const Navbar = () => {
   const handleNavigation = (path: string) => {
     navigate(path)
     handleClose()
+  }
+
+  // Function to toggle mobile chat dropdown
+  const toggleMobileChat = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsChatOpen(!isChatOpen)
   }
 
   return (
@@ -153,6 +169,26 @@ const Navbar = () => {
               )}
             </Button>
 
+            {/* Mobile Message Button - Visible only on small screens */}
+            <div className="relative md:hidden" ref={mobileChatRef}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full bg-emerald-50 hover:bg-emerald-100"
+                onClick={toggleMobileChat}
+              >
+                <MessageSquare className="h-5 w-5 text-emerald-600" />
+              </Button>
+              
+              {/* Mobile Chat Dropdown */}
+              {isChatOpen && (
+                <ChatDropdown 
+                  isOpen={isChatOpen} 
+                  onClose={() => setIsChatOpen(false)} 
+                />
+              )}
+            </div>
+
             {/* Desktop Icons */}
             <div className="hidden md:flex items-center space-x-2">
               <Button
@@ -228,6 +264,14 @@ const Navbar = () => {
                 <Users className="mr-3 h-5 w-5" />
                 Friends
               </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
+                onClick={() => handleNavigation('/messages')}
+              >
+                <MessageSquare className="mr-3 h-5 w-5" />
+                Messages
+              </Button>
             </div>
             <div className="pt-4 pb-3 border-t border-gray-200">
               <div className="flex items-center px-5">
@@ -240,44 +284,35 @@ const Navbar = () => {
               <div className="mt-3 space-y-1">
                 <Button
                   variant="ghost"
-                    className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
-                    onClick={() => {
-                      setIsCreatePostOpen(true)
-                      handleClose()
-                    }}
+                  className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
+                  onClick={() => {
+                    setIsCreatePostOpen(true)
+                    handleClose()
+                  }}
                 >
-                    <Plus className="mr-3 h-5 w-5" />
-                    Create
+                  <Plus className="mr-3 h-5 w-5" />
+                  Create
                 </Button>
                 <Button
                   variant="ghost"
-                    className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
-                    onClick={() => {
-                      if (window.event && (window.event as MouseEvent).ctrlKey) {
-                        handleNavigation('/messages');
-                      } else {
-                        setIsChatOpen(true);
-                        handleClose();
-                      }
-                    }}
+                  className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
+                  onClick={() => handleNavigation('/Profile')}
                 >
-                    <MessageSquare className="mr-3 h-5 w-5" />
-                    Messenger
+                  Profile
                 </Button>
                 <Button
                   variant="ghost"
-                    className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
-                    onClick={handleClose}
+                  className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
+                  onClick={() => handleNavigation('/Settings')}
                 >
-                    <Bell className="mr-3 h-5 w-5" />
-                    Notifications
+                  Settings
                 </Button>
               </div>
             </div>
           </div>
         )}
       </div>
-
+      
       {/* Create Post Dialog */}
       <CreatePostDialog
         isOpen={isCreatePostOpen}

@@ -1,6 +1,6 @@
 import { X, MessageSquare, UserPlus, Users } from 'lucide-react';
 import { Button } from './button';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { chatApi, Conversation, IUser } from '../../api/chatApi';
 import { Avatar, AvatarImage, AvatarFallback } from './avatar';
 import { useNavigate } from 'react-router-dom';
@@ -17,8 +17,11 @@ interface ChatDropdownProps {
 export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("conversations");
   const navigate = useNavigate();
   const { operationsStatus, fetchOperationsStatus } = useFriendStore();
+  const isMobile = window.innerWidth < 768;
+  const tabsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (isOpen) {
@@ -26,6 +29,20 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
       fetchOperationsStatus();
     }
   }, [isOpen, fetchOperationsStatus]);
+
+  // Detect if screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      const newIsMobile = window.innerWidth < 768;
+      if (newIsMobile !== isMobile) {
+        // Force re-render when mobile status changes
+        setConversations([...conversations]);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [conversations, isMobile]);
 
   const fetchConversations = async () => {
     try {
@@ -58,8 +75,10 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
         // Navigate to the conversation page
         navigate(`/messages/${response.conversation._id}`);
         
-        // Close the dropdown after creating the conversation
-        onClose();
+        // Only close dropdown in desktop view
+        if (!isMobile) {
+          onClose();
+        }
       } else {
         toast.error(response.message || 'Failed to create conversation');
       }
@@ -68,6 +87,15 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
       toast.error('Error creating conversation');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to navigate without closing dropdown
+  const navigateWithoutClosing = (path: string) => {
+    navigate(path);
+    // Only close dropdown in desktop view
+    if (!isMobile) {
+      onClose();
     }
   };
 
@@ -81,12 +109,23 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
   const friendsList = operationsStatus?.friends?.list || [];
   const hasFriends = friendsList.length > 0;
 
+  // Determine dropdown position and size based on mobile or desktop
+  const dropdownClasses = isMobile 
+    ? "fixed left-0 right-0 top-14 max-h-[70vh] overflow-y-auto z-50 chat-dropdown-content" 
+    : "absolute right-0 w-80 mt-2 max-h-[500px] overflow-y-auto z-50 chat-dropdown-content";
+
+  // Handle tab changes
+  const handleTabChange = (tab: string) => {
+    console.log("Changing tab to:", tab);
+    setActiveTab(tab);
+  };
+
   return (
-    <div className="absolute right-0 w-80 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
+    <div className={`${dropdownClasses} bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden`}>
       {/* Header */}
-      <div className="p-3 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
+      <div className="sticky top-0 p-3 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center z-10">
         <h3 className="font-semibold text-emerald-800">Messages</h3>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onClose}>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-100" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -96,161 +135,193 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
         </div>
       ) : conversations.length > 0 ? (
-        <Tabs defaultValue="conversations" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="conversations" className="text-xs">
-              <MessageSquare className="h-3 w-3 mr-1" />
-              Conversations
-            </TabsTrigger>
-            <TabsTrigger value="friends" className="text-xs">
-              <Users className="h-3 w-3 mr-1" />
-              Friends
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="conversations" className="max-h-80 overflow-y-auto">
-            {conversations.map((conversation) => {
-              const otherUser = getOtherParticipant(conversation.participants);
-              return (
-                <div 
-                  key={conversation._id} 
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center"
-                  onClick={() => {
-                    navigate(`/messages/${conversation._id}`);
-                    onClose();
-                  }}
-                >
-                  <Avatar className="h-10 w-10 mr-3">
-                    <AvatarImage src={getProfileImageUrl(otherUser.profilePicture)} alt={otherUser.name} />
-                    <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{otherUser.name}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {conversation.latestMessage ? conversation.latestMessage.content : 'No messages yet'}
-                    </p>
+        <div ref={tabsRef}>
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="sticky top-[57px] grid w-full grid-cols-2 bg-white z-10">
+              <TabsTrigger value="conversations" className="text-xs text-emerald-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
+                <MessageSquare className="h-3 w-3 mr-1" />
+                Conversations
+              </TabsTrigger>
+              <TabsTrigger value="friends" className="text-xs text-emerald-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
+                <Users className="h-3 w-3 mr-1" />
+                Friends
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="conversations" className="max-h-[calc(70vh-120px)] overflow-y-auto">
+              {conversations.map(conversation => {
+                const otherUser = getOtherParticipant(conversation.participants);
+                return (
+                  <div 
+                    key={conversation._id} 
+                    className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
+                    onClick={() => {
+                      navigateWithoutClosing(`/messages/${conversation._id}`);
+                    }}
+                  >
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarImage src={getProfileImageUrl(otherUser.profilePicture)} alt={otherUser.name} />
+                      <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 truncate">{otherUser.name}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {conversation.latestMessage ? conversation.latestMessage.content : 'No messages yet'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </TabsContent>
-          
-          <TabsContent value="friends" className="max-h-80 overflow-y-auto">
-            {hasFriends ? (
-              friendsList.map((friend) => (
-                <div 
-                  key={friend._id} 
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center"
-                  onClick={() => createOrOpenConversation(friend._id)}
-                >
-                  <Avatar className="h-10 w-10 mr-3">
-                    <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
-                    <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
-                    <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-8 w-8 p-0 text-emerald-600"
+                );
+              })}
+            </TabsContent>
+            
+            <TabsContent value="friends" className="max-h-[calc(70vh-120px)] overflow-y-auto">
+              {hasFriends ? (
+                friendsList.map((friend) => (
+                  <div 
+                    key={friend._id} 
+                    className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       createOrOpenConversation(friend._id);
                     }}
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
+                      <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
+                      <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createOrOpenConversation(friend._id);
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center h-40">
+                  <p className="text-sm text-gray-600 mb-2">No friends yet</p>
+                  <Button 
+                    onClick={() => navigateWithoutClosing('/friends')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    size="sm" 
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Find Friends
                   </Button>
                 </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center p-6 text-center h-40">
-                <p className="text-sm text-gray-600 mb-2">No friends yet</p>
-                <Button 
-                  onClick={() => navigate('/friends')}
-                  variant="outline" 
-                  size="sm" 
-                  className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Find Friends
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       ) : (
-        <Tabs defaultValue="friends" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="conversations" className="text-xs">
-              <MessageSquare className="h-3 w-3 mr-1" />
-              Conversations
-            </TabsTrigger>
-            <TabsTrigger value="friends" className="text-xs">
-              <Users className="h-3 w-3 mr-1" />
-              Friends
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="conversations">
-            <div className="flex flex-col items-center justify-center p-6 text-center h-40">
-              <div className="bg-gray-100 p-3 rounded-full mb-3">
-                <MessageSquare className="h-6 w-6 text-gray-500" />
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">No Messages Yet</h3>
-              <p className="text-sm text-gray-600 mb-2">
-                Start a conversation with one of your friends.
-              </p>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="friends" className="max-h-80 overflow-y-auto">
-            {hasFriends ? (
-              friendsList.map((friend) => (
-                <div 
-                  key={friend._id} 
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center"
-                  onClick={() => createOrOpenConversation(friend._id)}
+        <div ref={tabsRef}>
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="sticky top-[57px] grid w-full grid-cols-2 bg-white z-10">
+              <TabsTrigger value="conversations" className="text-xs text-emerald-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
+                <MessageSquare className="h-3 w-3 mr-1" />
+                Conversations
+              </TabsTrigger>
+              <TabsTrigger value="friends" className="text-xs text-emerald-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
+                <Users className="h-3 w-3 mr-1" />
+                Friends
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="conversations">
+              <div className="flex flex-col items-center justify-center p-6 text-center h-40">
+                <div className="bg-emerald-100 p-3 rounded-full mb-3">
+                  <MessageSquare className="h-6 w-6 text-emerald-500" />
+                </div>
+                <h3 className="font-semibold text-gray-800 mb-1">No Messages Yet</h3>
+                <p className="text-sm text-gray-600 mb-2">
+                  Start a conversation with one of your friends.
+                </p>
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleTabChange("friends");
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  size="sm"
                 >
-                  <Avatar className="h-10 w-10 mr-3">
-                    <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
-                    <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
-                    <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-8 w-8 p-0 text-emerald-600"
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Start a Conversation
+                </Button>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="friends" className="max-h-[calc(70vh-120px)] overflow-y-auto">
+              {hasFriends ? (
+                friendsList.map((friend) => (
+                  <div 
+                    key={friend._id} 
+                    className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       createOrOpenConversation(friend._id);
                     }}
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarImage src={getProfileImageUrl(friend.profilePicture)} alt={friend.name} />
+                      <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 truncate">{friend.name}</p>
+                      <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createOrOpenConversation(friend._id);
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center h-40">
+                  <p className="text-sm text-gray-600 mb-2">No friends yet</p>
+                  <Button 
+                    onClick={() => navigateWithoutClosing('/friends')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    size="sm"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Find Friends
                   </Button>
                 </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center p-6 text-center h-40">
-                <p className="text-sm text-gray-600 mb-2">No friends yet</p>
-                <Button 
-                  onClick={() => navigate('/friends')}
-                  variant="outline" 
-                  size="sm" 
-                  className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Find Friends
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       )}
+      
+      {/* Fixed footer with "See all" button */}
+      <div className="sticky bottom-0 p-2 bg-white border-t border-gray-100 text-center">
+        <Button 
+          className="bg-emerald-600 hover:bg-emerald-700 text-white w-full"
+          size="sm" 
+          onClick={() => navigateWithoutClosing('/messages')}
+        >
+          See All Messages
+        </Button>
+      </div>
     </div>
   );
 }

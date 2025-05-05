@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 
 interface VideoCallProps {
   roomId: string;
-  recipientId: string;
-  recipientName: string;
+  remoteUserId: string;
+  remoteUserName: string;
   onEndCall: () => void;
   isIncoming?: boolean;
   isAnswered?: boolean;
@@ -16,8 +16,8 @@ interface VideoCallProps {
 
 const VideoCall: React.FC<VideoCallProps> = ({
   roomId,
-  recipientId,
-  recipientName,
+  remoteUserId,
+  remoteUserName,
   onEndCall,
   isIncoming = false,
   isAnswered = false,
@@ -77,7 +77,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
         peerConnection.onicecandidate = (event) => {
           if (event.candidate) {
             socket.emit('signalData', {
-              to: recipientId,
+              to: remoteUserId,
               type: 'ice-candidate',
               payload: event.candidate,
               roomId
@@ -121,7 +121,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
               await peerConnection.setLocalDescription(answer);
               
               socket.emit('signalData', {
-                to: recipientId,
+                to: remoteUserId,
                 type: 'answer',
                 payload: answer,
                 roomId
@@ -163,7 +163,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
     return () => {
       cleanupCall();
     };
-  }, [roomId, recipientId, isIncoming, isAnswered]);
+  }, [roomId, remoteUserId, isIncoming, isAnswered]);
 
   // Create and send an offer
   const createOffer = async () => {
@@ -174,7 +174,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
       await peerConnectionRef.current.setLocalDescription(offer);
       
       socketRef.current.emit('signalData', {
-        to: recipientId,
+        to: remoteUserId,
         type: 'offer',
         payload: offer,
         roomId
@@ -189,7 +189,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
     if (socketRef.current) {
       socketRef.current.emit('endCall', {
         roomId,
-        to: recipientId
+        to: remoteUserId
       });
     }
     
@@ -254,7 +254,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
               <div className="animate-pulse h-24 w-24 bg-emerald-500 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Phone className="h-12 w-12 text-white" />
               </div>
-              <h3 className="text-xl font-medium">Connecting to {recipientName}...</h3>
+              <h3 className="text-xl font-medium">Connecting to {remoteUserName}...</h3>
               <p className="mt-2 text-gray-400">Please wait while we establish the connection</p>
             </div>
           </div>

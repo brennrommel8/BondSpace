@@ -834,6 +834,7 @@ export const PostCard = ({
               size="sm"
               variant="ghost"
               onClick={() => setShowComments(!showComments)}
+              className="text-emerald-600 hover:bg-emerald-50"
             >
               <MessageCircle className="mr-1 h-4 w-4" />
               {post.comments?.length || 0}
@@ -881,7 +882,7 @@ export const PostCard = ({
                           <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2">
                             <span>{format(new Date(comment.createdAt), 'MMM d, yyyy')}</span>
                             <button 
-                              className="text-gray-500 hover:text-emerald-500 font-medium"
+                              className="text-emerald-600 hover:text-emerald-700 font-medium"
                               onClick={() => setReplyingTo(commentId)}
                             >
                               Reply
@@ -1031,6 +1032,7 @@ export const PostCard = ({
                                 size="sm"
                                 onClick={() => handleReply(commentId)}
                                 disabled={!replyContent.trim()}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
                               >
                                 <Send className="h-4 w-4" />
                               </Button>
@@ -1063,7 +1065,11 @@ export const PostCard = ({
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
               />
-              <Button type="submit" disabled={!comment.trim() || isCommenting}>
+              <Button 
+                type="submit" 
+                disabled={!comment.trim() || isCommenting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
                 {isCommenting ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
                 ) : (
