@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { format } from 'date-fns';
-import { Send, Paperclip, Smile, Image, X, Play, Users, ChevronLeft, Menu, Trash2, Video } from 'lucide-react';
+import { Send, Paperclip, Smile, Image, X, Play, Users, ChevronLeft, Menu, Trash2, Video, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -27,7 +27,6 @@ import {
 import { videoCallApi } from '@/api/videoCallApi';
 import useSocket from '@/hooks/useSocket';
 import TypingIndicator from './TypingIndicator';
-import SocketConnectionStatus from './SocketConnectionStatus';
 import VideoCall from './VideoCall';
 import IncomingCallNotification from './IncomingCallNotification';
 
@@ -69,7 +68,7 @@ interface ConversationPanelProps {
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
   const { user } = useUserStore(); // Get current user from store
-  const { isConnected, onlineUsers } = useSocket(); // Use our socket hook
+  const { isConnected, onlineUsers, setIsConnected, forceReconnect } = useSocket(); // Use our socket hook
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationData | null>(null);
@@ -280,23 +279,46 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       const newMessageCleanup = onNewMessage((data) => {
         console.log('New message received via socket:', data);
         
-        if (data.conversationId === activeConversation._id) {
-          // If we received a full message object
-          if (data.messageObj) {
-            const newMessage = transformMessage(data.messageObj);
-            setMessages(prev => [...prev, newMessage]);
+        // Handle different possible data formats
+        const messageSenderId = data.senderId || (data.sender && (data.sender._id || data.sender));
+        const messageConversationId = data.conversationId || data.conversation;
+        const receivedMessageObj = data.messageObj || data.messageData || data;
+        
+        // If we have a valid conversation ID match
+        if (messageConversationId === activeConversation._id) {
+          console.log('Message is for current conversation');
+          
+          // Check if this is a complete message object we can use directly
+          if (receivedMessageObj && typeof receivedMessageObj === 'object' && 
+              (receivedMessageObj._id || receivedMessageObj.id)) {
+            console.log('Adding message from complete message object');
+            const newMessage = transformMessage(receivedMessageObj);
+            
+            // Only add if message doesn't already exist
+            setMessages(prev => {
+              const messageExists = prev.some(m => m._id === newMessage._id);
+              if (messageExists) {
+                console.log('Message already exists, skipping');
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
           } 
-          // If we only received the basic notification
-          else if (data.senderId) {
+          // If we received basic message info but not a complete object
+          else if (messageSenderId) {
+            console.log('Fetching complete message data from server');
             // This is a notification that a new message was created
             // We should fetch the latest messages to get the full message
             fetchMessages(activeConversation._id);
           }
-        } else {
+        } else if (messageConversationId) {
           // Message is for a different conversation
+          console.log('Message is for different conversation:', messageConversationId);
           // Update that conversation's unread count or refresh the conversations list
           toast.info('New message in another conversation');
           fetchConversations();
+        } else {
+          console.log('Could not determine conversation for message:', data);
         }
       });
       
@@ -934,6 +956,48 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     }
   }, [isConnected, user]);
 
+  // Add a socket reconnection button in the UI
+  const handleReconnectSocket = () => {
+    console.log('User manually triggered socket reconnection');
+    setIsConnected(false); // Show reconnecting state
+    
+    // Force socket reconnection
+    forceReconnect().then(success => {
+      console.log('Socket reconnection attempt result:', success);
+      setIsConnected(success);
+      
+      if (success && activeConversation) {
+        // Rejoin the conversation room
+        joinConversation(activeConversation._id);
+        // Fetch messages to ensure we're up to date
+        fetchMessages(activeConversation._id);
+        toast.success('Reconnected successfully');
+      } else {
+        toast.error('Failed to reconnect. Please try again.');
+      }
+    });
+  };
+
+  // Add this to the rendering of the conversations list (sidebar)
+  const renderSocketStatus = () => {
+    return (
+      <div className="flex items-center space-x-2 py-2 px-4 border-t">
+        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+        <span className="text-xs text-gray-500">
+          {isConnected ? 'Connected' : 'Disconnected'}
+        </span>
+        {!isConnected && (
+          <button
+            onClick={handleReconnectSocket}
+            className="ml-auto text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded"
+          >
+            Reconnect
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gray-100">
       {/* Video Call UI - shown when in a call */}
@@ -966,7 +1030,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       <div className={`${showConversationList ? 'flex' : 'hidden md:flex'} w-full md:w-1/3 md:max-w-xs bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">Messages</h2>
-          <SocketConnectionStatus />
         </div>
         
         <div className="flex-1 overflow-y-auto">
@@ -977,7 +1040,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-4 text-center">
               <div className="bg-emerald-100 p-3 rounded-full mb-3">
-                <Send className="h-6 w-6 text-emerald-500" />
+                <MessageSquare className="h-6 w-6 text-emerald-500" />
               </div>
               <p className="text-gray-600 mb-3">No conversations yet</p>
               <Button 
@@ -993,9 +1056,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
             renderConversations()
           )}
         </div>
+        
+        {/* Add socket status indicator at the bottom of the sidebar */}
+        {renderSocketStatus()}
       </div>
       
-      {/* Message Thread */}
+      {/* Right side with active conversation */}
       <div className={`${showConversationList ? 'hidden md:flex' : 'flex'} flex-1 flex-col`}>
         {activeConversation ? (
           <>

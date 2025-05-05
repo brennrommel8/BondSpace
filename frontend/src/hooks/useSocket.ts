@@ -6,7 +6,7 @@ import {
   getSocket,
   onUserOnline,
   onUserOffline,
-  
+  forceReconnect as forceSocketReconnect
 } from '@/utils/socketUtils';
 import { useUserStore } from '@/store/userStore';
 
@@ -14,6 +14,8 @@ interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
   onlineUsers: Set<string>;
+  setIsConnected: (connected: boolean) => void;
+  forceReconnect: () => Promise<boolean>;
 }
 
 /**
@@ -102,7 +104,28 @@ export const useSocket = (): UseSocketReturn => {
     }
   }, [socket]);
 
-  return { socket, isConnected, onlineUsers };
+  // Expose forceReconnect as a method that components can use
+  const handleForceReconnect = async (): Promise<boolean> => {
+    // Attempt to reconnect the socket
+    const success = await forceSocketReconnect();
+    
+    // Update local socket reference if reconnection was successful
+    if (success) {
+      const socketInstance = getSocket();
+      setSocket(socketInstance);
+      setIsConnected(!!socketInstance?.connected);
+    }
+    
+    return success;
+  };
+
+  return { 
+    socket, 
+    isConnected, 
+    onlineUsers, 
+    setIsConnected,
+    forceReconnect: handleForceReconnect
+  };
 };
 
 export default useSocket; 

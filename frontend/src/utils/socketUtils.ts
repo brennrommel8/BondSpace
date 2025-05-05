@@ -92,12 +92,16 @@ export const initializeSocket = (): Socket | null => {
       socket = io(SOCKET_URL, {
         ...SOCKET_OPTIONS,
         auth: { token }, // Backend looks for socket.handshake.auth.token
-        query: { token } // Some backends look for token in query params
+        query: { token }, // Some backends look for token in query params
+        reconnectionAttempts: 10, // Increase reconnection attempts
+        reconnectionDelay: 1000, // Start with a 1 second delay
+        reconnectionDelayMax: 5000, // Max delay between reconnection attempts
+        timeout: 20000, // Longer timeout for better connection chance
       });
       
       // Set up event listeners
       socket.on('connect', () => {
-        console.log('Socket connected successfully!');
+        console.log('Socket connected successfully!', new Date().toISOString());
         isConnectivityAvailable = true;
         saveSocketAvailability(true);
         
@@ -111,16 +115,23 @@ export const initializeSocket = (): Socket | null => {
         // Request a list of online users (with null check)
         if (socket) {
           socket.emit('requestOnlineUsers');
+          
+          // Also join any active conversation if the ID is in localStorage
+          const activeConversationId = localStorage.getItem('activeConversationId');
+          if (activeConversationId) {
+            console.log('Rejoining conversation room from localStorage:', activeConversationId);
+            socket.emit('joinConversation', activeConversationId);
+          }
         }
       });
       
       socket.on('connect_error', (err) => {
-        // Less verbose error logging
-        console.error('Socket connection error:', err.message);
+        console.error('Socket connection error:', err.message, new Date().toISOString());
         console.log('Socket connection details:', {
           url: SOCKET_URL,
           path: SOCKET_OPTIONS.path,
-          token: 'exists: ' + (!!getAuthToken())
+          token: 'exists: ' + (!!getAuthToken()),
+          reconnectionAttempts: socket?.io?.reconnectionAttempts
         });
         
         // Check if this is a 401 error (unauthorized)
@@ -131,23 +142,54 @@ export const initializeSocket = (): Socket | null => {
         // Check if this is a 404 error which means Socket.IO is not available on the server
         if (err.message.includes('404')) {
           console.warn('Socket.IO endpoint not found (404). The server does not support Socket.IO.');
-          isConnectivityAvailable = false; // Prevent further attempts
-          saveSocketAvailability(false);
+          // Don't set isConnectivityAvailable to false yet, allow reconnection attempts
         }
       });
       
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`Socket reconnection attempt ${attemptNumber}...`, new Date().toISOString());
+      });
+      
+      socket.on('reconnect', (attemptNumber) => {
+        console.log(`Socket reconnected after ${attemptNumber} attempts!`, new Date().toISOString());
+        
+        // Request a list of online users after reconnection
+        if (socket) {
+          socket.emit('requestOnlineUsers');
+          
+          // Rejoin any active conversation
+          const activeConversationId = localStorage.getItem('activeConversationId');
+          if (activeConversationId) {
+            console.log('Rejoining conversation after reconnect:', activeConversationId);
+            socket.emit('joinConversation', activeConversationId);
+          }
+        }
+      });
+      
+      socket.on('reconnect_error', (err) => {
+        console.error('Socket reconnection error:', err.message, new Date().toISOString());
+      });
+      
+      socket.on('reconnect_failed', () => {
+        console.error('Socket reconnection failed after all attempts', new Date().toISOString());
+        isConnectivityAvailable = false; // Now we can set this to false
+        saveSocketAvailability(false);
+      });
+      
       socket.on('disconnect', (reason) => {
-        if (reason !== 'io client disconnect') {
-          console.log('Socket disconnected:', reason);
+        console.log('Socket disconnected:', reason, new Date().toISOString());
+        
+        // If server disconnected us, try to reconnect
+        if (reason === 'io server disconnect') {
+          console.log('Server disconnected the socket, attempting reconnection...');
+          socket?.connect();
         }
       });
 
       // Listen for online users list when requested
-      if (socket) {
-        socket.on('onlineUsers', (users: string[]) => {
-          console.log('Received online users list:', users);
-        });
-      }
+      socket.on('onlineUsers', (users: string[]) => {
+        console.log('Received online users list:', users);
+      });
       
       // Connect manually
       socket.connect();
@@ -232,7 +274,21 @@ export const disconnectSocket = (): void => {
 export const joinConversation = (conversationId: string): void => {
   const s = getSafeSocket();
   if (s) {
+    console.log('Joining conversation room:', conversationId, new Date().toISOString());
+    
+    // Store the active conversation ID in localStorage for recovery after reconnects
+    localStorage.setItem('activeConversationId', conversationId);
+    
+    // Emit multiple event formats to ensure compatibility with different server implementations
     s.emit('joinConversation', conversationId);
+    s.emit('join', conversationId);
+    s.emit('join-room', conversationId);
+    
+    // Also try with different payload formats
+    s.emit('joinConversation', { conversationId });
+    s.emit('join', { roomId: conversationId });
+  } else {
+    console.error('Cannot join conversation: Socket connection not available');
   }
 };
 
@@ -240,7 +296,24 @@ export const joinConversation = (conversationId: string): void => {
 export const leaveConversation = (conversationId: string): void => {
   const s = getSafeSocket();
   if (s) {
+    console.log('Leaving conversation room:', conversationId, new Date().toISOString());
+    
+    // Clear the active conversation ID from localStorage
+    const storedConversationId = localStorage.getItem('activeConversationId');
+    if (storedConversationId === conversationId) {
+      localStorage.removeItem('activeConversationId');
+    }
+    
+    // Emit multiple event formats to ensure compatibility with different server implementations
     s.emit('leaveConversation', conversationId);
+    s.emit('leave', conversationId);
+    s.emit('leave-room', conversationId);
+    
+    // Also try with different payload formats
+    s.emit('leaveConversation', { conversationId });
+    s.emit('leave', { roomId: conversationId });
+  } else {
+    console.error('Cannot leave conversation: Socket connection not available');
   }
 };
 
@@ -289,9 +362,18 @@ export const sendPrivateMessage = (
 export const onNewMessage = (callback: (data: any) => void): () => void => {
   const s = getSafeSocket();
   if (s) {
+    // Listen for multiple possible event names that the server might use
     s.on('newMessage', callback);
+    s.on('message', callback);
+    s.on('privateMessage', callback);
+    s.on('receiveMessage', callback);
+    
+    // Return a cleanup function that removes all listeners
     return () => {
       s.off('newMessage', callback);
+      s.off('message', callback);
+      s.off('privateMessage', callback);
+      s.off('receiveMessage', callback);
     };
   }
   return () => {};
