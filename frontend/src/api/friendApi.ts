@@ -1,4 +1,5 @@
 import axios from 'axios'
+import api from '@/config/axios';
 
 const API_URL = 'https://socmed-backend-e8wf.onrender.com/api'
 
@@ -315,7 +316,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
   getFriendOperationsStatus: async (): Promise<FriendResponse & { data: FriendOperationsStatus }> => {
     try {
       console.log('Fetching friend operations status')
-      const response = await axios.get<FriendResponse & { data: FriendOperationsStatus }>(
+      const response = await api.get<FriendResponse & { data: FriendOperationsStatus }>(
         `${API_URL}/friends/operations/status`,
         {
           withCredentials: true,
@@ -329,11 +330,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
     } catch (error) {
       console.error('Get friend operations status error:', error)
       if (axios.isAxiosError(error)) {
-        console.error('Error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
-        })
+        console.error('Error details:', error.response?.data)
         throw new Error(error.response?.data?.message || 'Failed to fetch friend operations status')
       }
       throw error
