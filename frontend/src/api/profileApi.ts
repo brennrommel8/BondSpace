@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { UserProfile } from './authApi';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'https://socmed-backend-8q7a.onrender.com/api';
 
 interface ProfilePictureResponse {
   success: boolean;

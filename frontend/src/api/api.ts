@@ -1,1 +1,1 @@
-export const API_URL = 'http://localhost:3000/api' 
+export const API_URL = 'https://socmed-backend-8q7a.onrender.com/api' 
