@@ -1,5 +1,6 @@
 import axios from 'axios'
-import { API_BASE_URL } from '@/config/api'
+import api from '@/config/axios'
+import {  API_ENDPOINTS } from '@/config/api'
 
 // Store failed user IDs temporarily
 let tempFailedUserIds: string[] = [];
@@ -196,14 +197,8 @@ export const postApi = {
       }
       
       // Make an API call to get the user data
-      const response = await axios.get(
-        `${API_BASE_URL}/users/${userId}`,
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+      const response = await api.get<{success: boolean; data: User}>(
+        `${API_ENDPOINTS.API}/users/${userId}`
       );
       
       if (response.data && response.data.success && response.data.data) {
@@ -263,8 +258,8 @@ export const postApi = {
   getPosts: async (): Promise<PostsResponse> => {
     try {
       console.log('Fetching posts from API...');
-      const response = await axios.get<PostsResponse>(
-        `${API_BASE_URL}/posts`,
+      const response = await api.get<PostsResponse>(
+        `${API_ENDPOINTS.API}/posts`,
         {
           withCredentials: true,
           headers: {
@@ -308,8 +303,8 @@ export const postApi = {
   // Get a single post by ID
   getPost: async (postId: string): Promise<PostResponse> => {
     try {
-      const response = await axios.get<PostResponse>(
-        `${API_BASE_URL}/posts/${postId}`,
+      const response = await api.get<PostResponse>(
+        `${API_ENDPOINTS.API}/posts/${postId}`,
         {
           withCredentials: true,
           headers: {
@@ -339,8 +334,8 @@ export const postApi = {
         formData.append('content', content);
         formData.append('media', mediaFile);
         
-        response = await axios.post<PostResponse>(
-          `${API_BASE_URL}/posts`,
+        response = await api.post<PostResponse>(
+          `${API_ENDPOINTS.API}/posts`,
           formData,
           {
             withCredentials: true,
@@ -351,8 +346,8 @@ export const postApi = {
         );
       } else {
         // Otherwise just send JSON
-        response = await axios.post<PostResponse>(
-          `${API_BASE_URL}/posts`,
+        response = await api.post<PostResponse>(
+          `${API_ENDPOINTS.API}/posts`,
           { content },
           {
             withCredentials: true,
@@ -376,8 +371,8 @@ export const postApi = {
   // Like/unlike a post
   toggleLike: async (postId: string): Promise<ApiResponse<ReactionResponse>> => {
     try {
-      const response = await axios.put<ApiResponse<ReactionResponse>>(
-        `${API_BASE_URL}/posts/${postId}/like`,
+      const response = await api.put<ApiResponse<ReactionResponse>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/like`,
         {},
         {
           withCredentials: true,
@@ -399,8 +394,8 @@ export const postApi = {
   // Add a comment to a post
   addComment: async (postId: string, content: string): Promise<PostResponse> => {
     try {
-      const response = await axios.post<PostResponse>(
-        `${API_BASE_URL}/posts/${postId}/comments`,
+      const response = await api.post<PostResponse>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments`,
         { content },
         {
           withCredentials: true,
@@ -423,8 +418,8 @@ export const postApi = {
   // Reply to a comment
   replyToComment: async (postId: string, commentId: string, content: string): Promise<PostResponse> => {
     try {
-      const response = await axios.post<PostResponse>(
-        `${API_BASE_URL}/posts/${postId}/comments/${commentId}/replies`,
+      const response = await api.post<PostResponse>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies`,
         { content },
         {
           withCredentials: true,
@@ -450,8 +445,8 @@ export const postApi = {
       console.log(`Adding ${reactionType} reaction to post ${postId}`);
       
       // Use the like endpoint directly with the reactionType
-      const likeResponse = await axios.put<ApiResponse<ReactionResponse>>(
-        `${API_BASE_URL}/posts/${postId}/like`,
+      const likeResponse = await api.put<ApiResponse<ReactionResponse>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/like`,
         { reactionType }, // Pass the reaction type in the request body
         {
           withCredentials: true,
@@ -482,8 +477,8 @@ export const postApi = {
       // Make sure we're explicitly sending the correct reaction type
       console.log('Reaction payload:', { reactionType });
       
-      const response = await axios.put<ApiResponse<ReactionResponse>>(
-        `${API_BASE_URL}/posts/${postId}/comments/${commentId}/replies/${replyId}/react`,
+      const response = await api.put<ApiResponse<ReactionResponse>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies/${replyId}/react`,
         { reactionType },
         {
           withCredentials: true,
@@ -515,7 +510,7 @@ export const postApi = {
   getCommentsWithUserData: async (postId: string, userId?: string): Promise<any> => {
     try {
       // Use the exact endpoint format from the backend code
-      let url = `${API_BASE_URL}/posts/${postId}`;
+      let url = `${API_ENDPOINTS.API}/posts/${postId}`;
       
       console.log(`Fetching ${userId ? 'user comments' : 'post data'} for post ${postId}`);
       
@@ -525,7 +520,7 @@ export const postApi = {
         console.log(`Fetching comments by user ${userId} for post ${postId}`);
       }
       
-      const response = await axios.get(
+      const response = await api.get(
         url,
         {
           withCredentials: true,
@@ -624,8 +619,8 @@ export const postApi = {
     try {
       console.log(`Fetching reactions for post ${postId}`);
       
-      const response = await axios.get<ApiResponse<ReactionResponse>>(
-        `${API_BASE_URL}/posts/${postId}/reactions`,
+      const response = await api.get<ApiResponse<ReactionResponse>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/reactions`,
         {
           withCredentials: true,
           headers: {
@@ -649,8 +644,8 @@ export const postApi = {
     try {
       console.log(`Fetching reactions for reply ${replyId}`);
       
-      const response = await axios.get<ApiResponse<ReactionResponse>>(
-        `${API_BASE_URL}/posts/${postId}/comments/${commentId}/replies/${replyId}/reactions`,
+      const response = await api.get<ApiResponse<ReactionResponse>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies/${replyId}/reactions`,
         {
           withCredentials: true,
           headers: {

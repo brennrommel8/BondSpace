@@ -3,8 +3,18 @@
  * Central place to manage API URLs and endpoints
  */
 
-// Base API URL - can be changed based on environment
-export const API_BASE_URL = 'https://socmed-backend-e8wf.onrender.com'
+// Get API base URL from environment variables if available
+const getApiBaseUrl = () => {
+  // In production, use the environment variable if available
+  if (process.env.REACT_APP_API_URL || import.meta.env?.VITE_API_URL) {
+    return process.env.REACT_APP_API_URL || import.meta.env?.VITE_API_URL;
+  }
+  // Default to the current backend URL
+  return 'https://socmed-backend-e8wf.onrender.com';
+};
+
+// Base API URL
+export const API_BASE_URL = getApiBaseUrl();
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -48,5 +58,11 @@ export const API_ENDPOINTS = {
     END: (id: string) => `${API_BASE_URL}/api/calls/${id}/end`,
   }
 };
+
+// Log API configuration for debugging
+console.log('API Configuration:', {
+  BASE_URL: API_BASE_URL,
+  API_PREFIX: API_ENDPOINTS.API
+});
 
 export default API_ENDPOINTS; 

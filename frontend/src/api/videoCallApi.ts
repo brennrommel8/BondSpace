@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '@/config/axios';
 import { API_ENDPOINTS } from '@/config/api';
 
 export interface VideoCallData {
@@ -20,20 +20,14 @@ export const videoCallApi = {
   initiateCall: async (recipientId: string): Promise<{ success: boolean; call?: VideoCallData; roomId?: string; message?: string }> => {
     try {
       console.log('Initiating call to user:', recipientId);
-      const response = await axios.post<{ 
+      const response = await api.post<{ 
         success: boolean; 
         call?: VideoCallData; 
         roomId?: string; 
         message?: string 
       }>(
         API_ENDPOINTS.CALLS.INITIATE,
-        { recipientId },
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        { recipientId }
       );
       console.log('Initiate call response:', response.data);
       return response.data;
@@ -55,15 +49,9 @@ export const videoCallApi = {
   answerCall: async (callId: string): Promise<{ success: boolean; call?: VideoCallData; message?: string }> => {
     try {
       console.log('Answering call:', callId);
-      const response = await axios.post<{ success: boolean; call?: VideoCallData; message?: string }>(
+      const response = await api.post<{ success: boolean; call?: VideoCallData; message?: string }>(
         API_ENDPOINTS.CALLS.ANSWER(callId),
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        {}
       );
       console.log('Answer call response:', response.data);
       return response.data;
@@ -85,15 +73,9 @@ export const videoCallApi = {
   rejectCall: async (callId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Rejecting call:', callId);
-      const response = await axios.post<{ success: boolean; message?: string }>(
+      const response = await api.post<{ success: boolean; message?: string }>(
         API_ENDPOINTS.CALLS.REJECT(callId),
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        {}
       );
       console.log('Reject call response:', response.data);
       return response.data;
@@ -115,15 +97,9 @@ export const videoCallApi = {
   endCall: async (callId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Ending call:', callId);
-      const response = await axios.post<{ success: boolean; message?: string }>(
+      const response = await api.post<{ success: boolean; message?: string }>(
         API_ENDPOINTS.CALLS.END(callId),
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        {}
       );
       console.log('End call response:', response.data);
       return response.data;

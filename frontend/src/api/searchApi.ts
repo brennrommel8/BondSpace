@@ -1,6 +1,6 @@
 import axios from 'axios'
-
-const API_URL = 'https://socmed-backend-e8wf.onrender.com/api'
+import api from '@/config/axios'
+import { API_ENDPOINTS } from '@/config/api'
 
 export interface UserSearchResult {
   id: string
@@ -74,12 +74,7 @@ export interface UserProfileResponse {
 
 export const searchUsers = async (query: string): Promise<SearchResponse> => {
   try {
-    const response = await axios.get(`${API_URL}/users/search?query=${query}`, {
-      withCredentials: true,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+    const response = await api.get(`${API_ENDPOINTS.USER.SEARCH}?query=${query}`)
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -92,12 +87,7 @@ export const searchUsers = async (query: string): Promise<SearchResponse> => {
 export const getUserProfile = async (username: string): Promise<UserProfileResponse> => {
   try {
     console.log(`Fetching profile for username: ${username}`);
-    const response = await axios.get(`${API_URL}/users/${username}`, {
-      withCredentials: true,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+    const response = await api.get(`${API_ENDPOINTS.API}/users/${username}`)
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
