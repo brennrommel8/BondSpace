@@ -3,18 +3,8 @@
  * Central place to manage API URLs and endpoints
  */
 
-// Get API base URL from environment variables if available
-const getApiBaseUrl = () => {
-  // In production, use the environment variable if available
-  if (process.env.REACT_APP_API_URL || import.meta.env?.VITE_API_URL) {
-    return process.env.REACT_APP_API_URL || import.meta.env?.VITE_API_URL;
-  }
-  // Default to the current backend URL
-  return 'https://socmed-backend-e8wf.onrender.com';
-};
-
-// Base API URL
-export const API_BASE_URL = getApiBaseUrl();
+// Base API URL - hardcoded
+export const API_BASE_URL = 'https://socmed-backend-e8wf.onrender.com';
 
 // API endpoints
 export const API_ENDPOINTS = {

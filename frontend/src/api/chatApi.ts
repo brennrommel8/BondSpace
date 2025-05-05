@@ -1,6 +1,7 @@
-
 import api from '@/config/axios';
-import { API_ENDPOINTS } from '@/config/api';
+
+// Hardcoded API URL
+const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
 
 export interface IUser {
   _id: string;
@@ -56,7 +57,7 @@ export const chatApi = {
       console.log('Creating/getting conversation with participant:', participantId);
       // Using configured axios instance
       const response = await api.post<ConversationResponse>(
-        API_ENDPOINTS.CHAT.CONVERSATIONS,
+        `${API_URL}/chat/conversations`,
         { participantId }
       );
       console.log('Create/get conversation response:', response.data);
@@ -79,7 +80,7 @@ export const chatApi = {
     try {
       console.log('Fetching conversations...');
       // Using configured axios instance
-      const response = await api.get(API_ENDPOINTS.CHAT.CONVERSATIONS);
+      const response = await api.get(`${API_URL}/chat/conversations`);
       console.log('Get conversations response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -101,7 +102,7 @@ export const chatApi = {
     try {
       console.log('Fetching messages for conversation:', conversationId);
       // Using configured axios instance
-      const response = await api.get(API_ENDPOINTS.CHAT.MESSAGES_BY_CONVERSATION(conversationId));
+      const response = await api.get(`${API_URL}/chat/conversations/${conversationId}/messages`);
       console.log('Get messages response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -171,7 +172,7 @@ export const chatApi = {
       
       // We need a custom config for the FormData content type
       const response = await api.post(
-        API_ENDPOINTS.CHAT.MESSAGES, 
+        `${API_URL}/chat/messages`, 
         formData,
         {
           headers: {
@@ -200,7 +201,7 @@ export const chatApi = {
   deleteMessage: async (messageId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Deleting message:', messageId);
-      const response = await api.delete(API_ENDPOINTS.CHAT.DELETE_MESSAGE(messageId));
+      const response = await api.delete(`${API_URL}/chat/messages/${messageId}`);
       console.log('Delete message response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -221,7 +222,7 @@ export const chatApi = {
   markMessagesAsRead: async (conversationId: string): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log('Marking messages as read in conversation:', conversationId);
-      const response = await api.patch(API_ENDPOINTS.CHAT.READ_MESSAGES(conversationId), {});
+      const response = await api.patch(`${API_URL}/chat/conversations/${conversationId}/messages/read`, {});
       console.log('Mark messages as read response:', response.data);
       return response.data;
     } catch (error: any) {

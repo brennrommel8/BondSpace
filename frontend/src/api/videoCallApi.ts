@@ -1,5 +1,7 @@
 import api from '@/config/axios';
-import { API_ENDPOINTS } from '@/config/api';
+
+// Hardcoded API URL
+const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
 
 export interface VideoCallData {
   _id: string;
@@ -26,7 +28,7 @@ export const videoCallApi = {
         roomId?: string; 
         message?: string 
       }>(
-        API_ENDPOINTS.CALLS.INITIATE,
+        `${API_URL}/calls/initiate`,
         { recipientId }
       );
       console.log('Initiate call response:', response.data);
@@ -50,7 +52,7 @@ export const videoCallApi = {
     try {
       console.log('Answering call:', callId);
       const response = await api.post<{ success: boolean; call?: VideoCallData; message?: string }>(
-        API_ENDPOINTS.CALLS.ANSWER(callId),
+        `${API_URL}/calls/${callId}/answer`,
         {}
       );
       console.log('Answer call response:', response.data);
@@ -74,7 +76,7 @@ export const videoCallApi = {
     try {
       console.log('Rejecting call:', callId);
       const response = await api.post<{ success: boolean; message?: string }>(
-        API_ENDPOINTS.CALLS.REJECT(callId),
+        `${API_URL}/calls/${callId}/reject`,
         {}
       );
       console.log('Reject call response:', response.data);
@@ -98,7 +100,7 @@ export const videoCallApi = {
     try {
       console.log('Ending call:', callId);
       const response = await api.post<{ success: boolean; message?: string }>(
-        API_ENDPOINTS.CALLS.END(callId),
+        `${API_URL}/calls/${callId}/end`,
         {}
       );
       console.log('End call response:', response.data);

@@ -1,6 +1,8 @@
 import axios from 'axios'
 import api from '@/config/axios'
-import {  API_ENDPOINTS } from '@/config/api'
+
+// Hardcoded API URL
+const API_URL = 'https://socmed-backend-e8wf.onrender.com/api';
 
 // Store failed user IDs temporarily
 let tempFailedUserIds: string[] = [];
@@ -198,7 +200,7 @@ export const postApi = {
       
       // Make an API call to get the user data
       const response = await api.get<{success: boolean; data: User}>(
-        `${API_ENDPOINTS.API}/users/${userId}`
+        `${API_URL}/users/${userId}`
       );
       
       if (response.data && response.data.success && response.data.data) {
@@ -259,7 +261,7 @@ export const postApi = {
     try {
       console.log('Fetching posts from API...');
       const response = await api.get<PostsResponse>(
-        `${API_ENDPOINTS.API}/posts`,
+        `${API_URL}/posts`,
         {
           withCredentials: true,
           headers: {
@@ -304,7 +306,7 @@ export const postApi = {
   getPost: async (postId: string): Promise<PostResponse> => {
     try {
       const response = await api.get<PostResponse>(
-        `${API_ENDPOINTS.API}/posts/${postId}`,
+        `${API_URL}/posts/${postId}`,
         {
           withCredentials: true,
           headers: {
@@ -335,7 +337,7 @@ export const postApi = {
         formData.append('media', mediaFile);
         
         response = await api.post<PostResponse>(
-          `${API_ENDPOINTS.API}/posts`,
+          `${API_URL}/posts`,
           formData,
           {
             withCredentials: true,
@@ -347,7 +349,7 @@ export const postApi = {
       } else {
         // Otherwise just send JSON
         response = await api.post<PostResponse>(
-          `${API_ENDPOINTS.API}/posts`,
+          `${API_URL}/posts`,
           { content },
           {
             withCredentials: true,
@@ -372,7 +374,7 @@ export const postApi = {
   toggleLike: async (postId: string): Promise<ApiResponse<ReactionResponse>> => {
     try {
       const response = await api.put<ApiResponse<ReactionResponse>>(
-        `${API_ENDPOINTS.API}/posts/${postId}/like`,
+        `${API_URL}/posts/${postId}/like`,
         {},
         {
           withCredentials: true,
@@ -395,7 +397,7 @@ export const postApi = {
   addComment: async (postId: string, content: string): Promise<PostResponse> => {
     try {
       const response = await api.post<PostResponse>(
-        `${API_ENDPOINTS.API}/posts/${postId}/comments`,
+        `${API_URL}/posts/${postId}/comments`,
         { content },
         {
           withCredentials: true,
@@ -419,7 +421,7 @@ export const postApi = {
   replyToComment: async (postId: string, commentId: string, content: string): Promise<PostResponse> => {
     try {
       const response = await api.post<PostResponse>(
-        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies`,
+        `${API_URL}/posts/${postId}/comments/${commentId}/replies`,
         { content },
         {
           withCredentials: true,
@@ -446,7 +448,7 @@ export const postApi = {
       
       // Use the like endpoint directly with the reactionType
       const likeResponse = await api.put<ApiResponse<ReactionResponse>>(
-        `${API_ENDPOINTS.API}/posts/${postId}/like`,
+        `${API_URL}/posts/${postId}/like`,
         { reactionType }, // Pass the reaction type in the request body
         {
           withCredentials: true,
@@ -478,7 +480,7 @@ export const postApi = {
       console.log('Reaction payload:', { reactionType });
       
       const response = await api.put<ApiResponse<ReactionResponse>>(
-        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies/${replyId}/react`,
+        `${API_URL}/posts/${postId}/comments/${commentId}/replies/${replyId}/react`,
         { reactionType },
         {
           withCredentials: true,
@@ -510,7 +512,7 @@ export const postApi = {
   getCommentsWithUserData: async (postId: string, userId?: string): Promise<any> => {
     try {
       // Use the exact endpoint format from the backend code
-      let url = `${API_ENDPOINTS.API}/posts/${postId}`;
+      let url = `${API_URL}/posts/${postId}`;
       
       console.log(`Fetching ${userId ? 'user comments' : 'post data'} for post ${postId}`);
       
@@ -620,7 +622,7 @@ export const postApi = {
       console.log(`Fetching reactions for post ${postId}`);
       
       const response = await api.get<ApiResponse<ReactionResponse>>(
-        `${API_ENDPOINTS.API}/posts/${postId}/reactions`,
+        `${API_URL}/posts/${postId}/reactions`,
         {
           withCredentials: true,
           headers: {
@@ -645,7 +647,7 @@ export const postApi = {
       console.log(`Fetching reactions for reply ${replyId}`);
       
       const response = await api.get<ApiResponse<ReactionResponse>>(
-        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/replies/${replyId}/reactions`,
+        `${API_URL}/posts/${postId}/comments/${commentId}/replies/${replyId}/reactions`,
         {
           withCredentials: true,
           headers: {
