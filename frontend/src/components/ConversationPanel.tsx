@@ -48,7 +48,7 @@ interface ConversationParticipant {
   _id: string;
   name: string;
   username: string;
-  profilePicture?: string | { url: string };
+  profilePicture?: string | { url: string; publicId: string };
 }
 
 interface ConversationData {
@@ -189,9 +189,31 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         } else {
           // Message is for a different conversation
           console.log('Message is for different conversation:', messageConversationId);
-          // Refresh conversations to update the last message
-          fetchConversations();
-          toast.info('New message in another conversation');
+          
+          // Update the unread count for the conversation
+          setConversations(prev => prev.map(conv => {
+            if (conv._id === messageConversationId) {
+              return {
+                ...conv,
+                unreadCount: conv.unreadCount + 1,
+                lastMessage: {
+                  _id: Date.now().toString(),
+                  content: data.message || data.content,
+                  sender: {
+                    _id: messageSenderId,
+                    name: data.senderName || 'Unknown',
+                    username: data.senderUsername || 'unknown'
+                  },
+                  createdAt: new Date().toISOString(),
+                  read: false
+                }
+              };
+            }
+            return conv;
+          }));
+          
+          // Show notification for new message
+          toast.info('New message received');
         }
       });
       
@@ -298,8 +320,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         username: p.username,
         profilePicture: p.profilePicture
       })),
-      lastMessage: apiConv.latestMessage ? transformMessage(apiConv.latestMessage) : undefined,
-      unreadCount: 0,
+      lastMessage: apiConv.lastMessage ? transformMessage(apiConv.lastMessage) : undefined,
+      unreadCount: apiConv.unreadCount || 0,
       updatedAt: apiConv.updatedAt
     };
   };
@@ -601,6 +623,14 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     // Initialize socket connection when opening a conversation
     initializeSocketConnection();
     fetchMessages(conversation._id);
+    
+    // Mark conversation as read when selected
+    if (conversation.unreadCount > 0) {
+      markConversationAsRead(conversation._id);
+      // Clear any existing notifications for this conversation
+      toast.dismiss();
+    }
+    
     // Hide conversation list on mobile when a conversation is selected
     if (window.innerWidth < 768) {
       setShowConversationList(false);
@@ -661,25 +691,80 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       const otherUser = getOtherParticipant(conversation);
       const isActive = activeConversation?._id === conversation._id;
       const isOnline = isUserOnline(otherUser._id);
-      
+      const hasUnread = conversation.unreadCount > 0;
+
+      // Format the last message preview
+      const getLastMessagePreview = () => {
+        if (!conversation.lastMessage) {
+          return 'No messages yet';
+        }
+
+        if (conversation.lastMessage.deleted) {
+          return 'This message was deleted';
+        }
+
+        if (conversation.lastMessage.media && conversation.lastMessage.media.length > 0) {
+          const mediaCount = conversation.lastMessage.media.length;
+          const mediaType = conversation.lastMessage.media[0].mediaType;
+          return `${mediaCount} ${mediaType}${mediaCount > 1 ? 's' : ''}`;
+        }
+
+        if (conversation.lastMessage.content) {
+          // Truncate long messages
+          return conversation.lastMessage.content.length > 30
+            ? conversation.lastMessage.content.substring(0, 30) + '...'
+            : conversation.lastMessage.content;
+        }
+
+        return 'No messages yet';
+      };
+
+      // Format the last message time
+      const getLastMessageTime = () => {
+        if (!conversation.lastMessage) {
+          return '';
+        }
+
+        const messageDate = new Date(conversation.lastMessage.createdAt);
+        const now = new Date();
+        const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
+
+        if (diffInHours < 24) {
+          return formatTime(conversation.lastMessage.createdAt);
+        } else if (diffInHours < 48) {
+          return 'Yesterday';
+        } else {
+          return format(messageDate, 'MMM d');
+        }
+      };
+
+      // Get the sender prefix for the last message
+      const getLastMessagePrefix = () => {
+        if (!conversation.lastMessage) return '';
+        
+        const isOwnMessage = conversation.lastMessage.sender._id === userId;
+        return isOwnMessage ? 'You: ' : '';
+      };
+
       return (
         <div 
           key={conversation._id}
           className={`flex items-center p-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${
             isActive ? 'bg-emerald-50' : ''
-          }`}
+          } ${hasUnread ? 'bg-blue-50' : ''}`}
           onClick={() => selectConversation(conversation)}
         >
           <div className="relative">
             <Avatar className="h-12 w-12 mr-3">
               <AvatarImage 
-                src={getProfileImageUrl(otherUser.profilePicture)} 
+                src={getProfileImageUrl(otherUser.profilePicture, otherUser.username)} 
+                username={otherUser.username}
                 alt={otherUser.name} 
               />
               <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
             </Avatar>
             {conversation.unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
                 {conversation.unreadCount}
               </span>
             )}
@@ -688,15 +773,23 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex justify-between">
-              <p className="font-medium text-gray-900 truncate">{otherUser.name}</p>
-              <p className="text-xs text-gray-500">
-                {conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : ''}
+            <div className="flex justify-between items-center mb-1">
+              <p className={`font-medium truncate ${hasUnread ? 'text-blue-600' : 'text-gray-900'}`}>
+                {otherUser.name}
+              </p>
+              <p className={`text-xs ${hasUnread ? 'text-blue-500' : 'text-gray-500'} ml-2 whitespace-nowrap`}>
+                {getLastMessageTime()}
               </p>
             </div>
-            <p className="text-sm text-gray-500 truncate">
-              {conversation.lastMessage ? conversation.lastMessage.content : 'No messages yet'}
-            </p>
+            <div className="flex items-center">
+              <p className={`text-sm truncate ${hasUnread ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+                <span className="text-gray-500">{getLastMessagePrefix()}</span>
+                {getLastMessagePreview()}
+              </p>
+              {hasUnread && (
+                <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -1037,6 +1130,23 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         </span>
       </div>
     );
+  };
+
+  // Add a function to mark conversation as read
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const response = await chatApi.markConversationAsRead(conversationId);
+      if (response.success) {
+        // Update the conversation's unread count in the state
+        setConversations(prev => prev.map(conv => 
+          conv._id === conversationId 
+            ? { ...conv, unreadCount: 0 }
+            : conv
+        ));
+      }
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import api from '@/config/axios'
 import { API_ENDPOINTS } from '@/config/api'
+import axios from 'axios'
 
 export interface IUser {
   _id: string;
@@ -33,14 +34,24 @@ export interface Message {
 export interface Conversation {
   _id: string;
   participants: IUser[];
-  latestMessage?: Message;
+  lastMessage?: Message;
+  unreadCount: number;
+  notifications?: Notification[];
   createdAt: string;
   updatedAt: string;
 }
 
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
 interface ConversationResponse {
   success: boolean;
-  conversation?: Conversation;
+  conversations?: Conversation[];
+  pagination?: PaginationInfo;
   message?: string;
 }
 
@@ -72,13 +83,14 @@ export const chatApi = {
   
   /**
    * Get all conversations for the current user
-   * @returns List of user conversations
+   * @returns List of user conversations with pagination
    */
-  getConversations: async (): Promise<{ success: boolean; conversations?: Conversation[]; message?: string }> => {
+  getConversations: async (page: number = 1, limit: number = 20): Promise<ConversationResponse> => {
     try {
       console.log('Fetching conversations...');
-      // Using configured axios instance
-      const response = await api.get(`${API_ENDPOINTS.API}/chat/conversations`);
+      const response = await api.get(`${API_ENDPOINTS.API}/chat/conversations`, {
+        params: { page, limit }
+      });
       console.log('Get conversations response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -230,6 +242,18 @@ export const chatApi = {
         success: false,
         message: error.response?.data?.message || 'Failed to mark messages as read'
       };
+    }
+  },
+
+  markConversationAsRead: async (conversationId: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await api.put(`${API_ENDPOINTS.CHAT}/conversations/${conversationId}/read`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || 'Failed to mark conversation as read');
+      }
+      throw error;
     }
   }
 };
