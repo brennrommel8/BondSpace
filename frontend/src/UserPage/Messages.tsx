@@ -4,7 +4,7 @@ import { useUserStore } from '@/store/userStore';
 import ConversationPanel from '@/components/ConversationPanel';
 import { toast } from 'sonner';
 import { useFriendStore } from '@/store/friendStore';
-import { chatApi } from '@/api/chatApi';
+import { chatApi, IUser } from '@/api/chatApi';
 import { Button } from '@/components/ui/button';
 import { Users, LogIn } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -39,9 +39,9 @@ const Messages: React.FC = () => {
   const createConversation = async (friendId: string) => {
     try {
       const response = await chatApi.createOrGetConversation(friendId);
-      if (response.success && response.conversation) {
-        navigate(`/messages/${response.conversation._id}`);
-        toast.success(`Started conversation with ${response.conversation.participants.find(p => p._id !== user?._id)?.name}`);
+      if (response.success && response.conversations?.[0]) {
+        navigate(`/messages/${response.conversations[0]._id}`);
+        toast.success(`Started conversation with ${response.conversations[0].participants.find((p: IUser) => p._id !== user?._id)?.name}`);
       } else {
         toast.error(response.message || 'Failed to create conversation');
       }

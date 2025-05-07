@@ -62,18 +62,18 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
     try {
       setLoading(true);
       const response = await chatApi.createOrGetConversation(userId);
-      if (response.success && response.conversation) {
+      if (response.success && response.conversations?.[0]) {
         // Add the new conversation to the list if it's not already there
         const existingConversation = conversations.find(
-          (conv) => conv._id === response.conversation?._id
+          (conv) => conv._id === response.conversations?.[0]?._id
         );
         
-        if (!existingConversation && response.conversation) {
-          setConversations([response.conversation, ...conversations]);
+        if (!existingConversation && response.conversations?.[0]) {
+          setConversations([response.conversations[0], ...conversations]);
         }
         
         // Navigate to the conversation page
-        navigate(`/messages/${response.conversation._id}`);
+        navigate(`/messages/${response.conversations[0]._id}`);
         
         // Only close dropdown in desktop view
         if (!isMobile) {
@@ -166,7 +166,7 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-gray-900 truncate">{otherUser.name}</p>
                       <p className="text-xs text-gray-500 truncate">
-                        {conversation.latestMessage ? conversation.latestMessage.content : 'No messages yet'}
+                        {conversation.lastMessage ? conversation.lastMessage.content : 'No messages yet'}
                       </p>
                     </div>
                   </div>

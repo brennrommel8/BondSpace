@@ -188,7 +188,7 @@ const Visit = () => {
       
       const response = await chatApi.createOrGetConversation(userId)
       
-      if (response.success && response.conversation) {
+      if (response.success && response.conversations?.[0]) {
         toast.success(`Started conversation with ${profile.data.user.name}`)
       } else {
         toast.error(response.message || 'Failed to start conversation')
