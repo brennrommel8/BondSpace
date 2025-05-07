@@ -229,6 +229,20 @@ export const initializeSocket = (): Socket | null => {
         console.log('Received broadcast user offline:', userId);
         socket?.emit('userOfflineReceived', userId);
       });
+
+      // Listen for message deletion events
+      socket.on('messageDeleted', (data: { conversationId: string, messageId: string }) => {
+        console.log('Message deleted:', data);
+        // Broadcast this to all clients in the conversation
+        socket?.emit('broadcastMessageDeleted', data);
+      });
+
+      // Listen for broadcast message deletion events
+      socket.on('broadcastMessageDeleted', (data: { conversationId: string, messageId: string }) => {
+        console.log('Received broadcast message deleted:', data);
+        // Update the UI through the hook
+        socket?.emit('messageDeletedReceived', data);
+      });
     } catch (err) {
       console.error('Error creating socket connection:', err);
       socket = null;
@@ -490,9 +504,15 @@ export const onMessageRead = (callback: (data: { conversationId: string, message
 export const onMessageDeleted = (callback: (data: { conversationId: string, messageId: string }) => void): () => void => {
   const s = getSafeSocket();
   if (s) {
+    // Listen for both direct and broadcast deletion events
     s.on('messageDeleted', callback);
+    s.on('broadcastMessageDeleted', callback);
+    s.on('messageDeletedReceived', callback);
+    
     return () => {
       s.off('messageDeleted', callback);
+      s.off('broadcastMessageDeleted', callback);
+      s.off('messageDeletedReceived', callback);
     };
   }
   return () => {};
@@ -502,7 +522,16 @@ export const onMessageDeleted = (callback: (data: { conversationId: string, mess
 export const sendMessageDeletionNotification = (conversationId: string, messageId: string): void => {
   const s = getSafeSocket();
   if (s) {
+    console.log('Sending message deletion notification:', { conversationId, messageId });
+    
+    // Emit to the conversation room
     s.emit('messageDeleted', {
+      conversationId,
+      messageId
+    });
+
+    // Also emit to the server for broadcasting
+    s.emit('deleteMessage', {
       conversationId,
       messageId
     });
