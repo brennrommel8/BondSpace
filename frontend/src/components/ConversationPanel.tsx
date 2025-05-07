@@ -95,17 +95,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   } | null>(null);
   const [initiatingCall, setInitiatingCall] = useState(false);
 
-  // Transform API conversation to local format
-  const transformConversation = (apiConv: Conversation): ConversationData => {
-    return {
-      _id: apiConv._id,
-      participants: apiConv.participants,
-      lastMessage: apiConv.latestMessage ? transformMessage(apiConv.latestMessage) : undefined,
-      unreadCount: 0, // Default to 0 if not provided by API
-      updatedAt: apiConv.updatedAt
-    };
-  };
-
   // Transform API message to local format
   const transformMessage = (apiMsg: ApiMessage): Message => {
     // Handle case where sender could be a string ID or a full user object
@@ -120,12 +109,15 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       };
     } else {
       // If sender is a user object
-      senderObj = apiMsg.sender;
+      senderObj = {
+        _id: apiMsg.sender._id,
+        name: apiMsg.sender.name,
+        username: apiMsg.sender.username,
+        profilePicture: apiMsg.sender.profilePicture
+      };
     }
     
     // Determine if message has been read by checking readBy array
-    // For own messages, check if any other participant has read it
-    // For others' messages, doesn't matter as we show read status only for own messages
     const isRead = Array.isArray(apiMsg.readBy) && 
                   apiMsg.readBy.some(readerId => readerId !== userId);
     
@@ -135,8 +127,24 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       media: apiMsg.media,
       sender: senderObj,
       createdAt: apiMsg.createdAt,
-      read: isRead, // Set based on readBy array
-      deleted: apiMsg.content === undefined && (!apiMsg.media || apiMsg.media.length === 0) // Message with no content or media is considered deleted
+      read: isRead,
+      deleted: apiMsg.content === undefined && (!apiMsg.media || apiMsg.media.length === 0)
+    };
+  };
+
+  // Transform API conversation to local format
+  const transformConversation = (apiConv: Conversation): ConversationData => {
+    return {
+      _id: apiConv._id,
+      participants: apiConv.participants.map(p => ({
+        _id: p._id,
+        name: p.name,
+        username: p.username,
+        profilePicture: p.profilePicture
+      })),
+      lastMessage: apiConv.latestMessage ? transformMessage(apiConv.latestMessage) : undefined,
+      unreadCount: 0,
+      updatedAt: apiConv.updatedAt
     };
   };
 
@@ -634,7 +642,10 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         >
           <div className="relative">
             <Avatar className="h-12 w-12 mr-3">
-              <AvatarImage src={getProfileImageUrl(otherUser.profilePicture)} alt={otherUser.name} />
+              <AvatarImage 
+                src={getProfileImageUrl(otherUser.profilePicture)} 
+                alt={otherUser.name} 
+              />
               <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
             </Avatar>
             {conversation.unreadCount > 0 && (
