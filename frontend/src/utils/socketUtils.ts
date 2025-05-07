@@ -64,29 +64,18 @@ export const resetSocketAvailability = (): void => {
 // Initialize the socket connection
 export const initializeSocket = (): Socket | null => {
   try {
-    // Skip if we know Socket.IO connectivity is unavailable
-    if (shouldSkipSocketIO()) {
-      console.log('Socket.IO connectivity unavailable - skipping connection attempt');
-      return null;
+    // Check if we already have a socket instance
+    if (socket?.connected) {
+      console.log('Using existing socket connection');
+      return socket;
     }
 
-    // Get the token using our consistent method
-    console.log('Initializing socket connection...');
+    // Get the auth token
     const token = getAuthToken();
-    
     if (!token) {
-      console.warn('No authentication token found - Please ensure you are logged in');
+      console.error('No auth token available for socket connection');
       return null;
     }
-
-    // Close existing connection if exists
-    if (socket) {
-      console.log('Closing existing socket connection');
-      socket.disconnect();
-    }
-    
-    // Create new socket connection with auth token
-    console.log('Creating new socket connection to:', SOCKET_URL);
     
     try {
       // Create socket with exact format expected by the backend
@@ -189,6 +178,22 @@ export const initializeSocket = (): Socket | null => {
       // Listen for online users list when requested
       socket.on('onlineUsers', (users: string[]) => {
         console.log('Received online users list:', users);
+        // Emit an event to notify all clients about the updated online users list
+        socket?.emit('broadcastOnlineUsers', users);
+      });
+
+      // Listen for user online status changes
+      socket.on('userOnline', (userId: string) => {
+        console.log('User came online:', userId);
+        // Broadcast this to all connected clients
+        socket?.emit('broadcastUserOnline', userId);
+      });
+
+      // Listen for user offline status changes
+      socket.on('userOffline', (userId: string) => {
+        console.log('User went offline:', userId);
+        // Broadcast this to all connected clients
+        socket?.emit('broadcastUserOffline', userId);
       });
     } catch (err) {
       console.error('Error creating socket connection:', err);

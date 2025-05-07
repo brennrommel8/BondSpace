@@ -4,8 +4,6 @@ import {
   initializeSocket, 
   disconnectSocket, 
   getSocket,
-  onUserOnline,
-  onUserOffline,
   forceReconnect as forceSocketReconnect
 } from '@/utils/socketUtils';
 import { useUserStore } from '@/store/userStore';
@@ -50,8 +48,21 @@ export const useSocket = (): UseSocketReturn => {
         setIsConnected(false);
       });
 
+      // Listen for online users list updates
+      socketInstance.on('onlineUsers', (users: string[]) => {
+        console.log('Received online users list:', users);
+        setOnlineUsers(new Set(users));
+      });
+
+      // Listen for broadcast online users list
+      socketInstance.on('broadcastOnlineUsers', (users: string[]) => {
+        console.log('Received broadcast online users list:', users);
+        setOnlineUsers(new Set(users));
+      });
+
       // Track online users
-      const cleanupOnline = onUserOnline((userId: string) => {
+      socketInstance.on('userOnline', (userId: string) => {
+        console.log('User came online:', userId);
         setOnlineUsers(prev => {
           const updated = new Set(prev);
           updated.add(userId);
@@ -59,7 +70,26 @@ export const useSocket = (): UseSocketReturn => {
         });
       });
 
-      const cleanupOffline = onUserOffline((userId: string) => {
+      socketInstance.on('broadcastUserOnline', (userId: string) => {
+        console.log('Received broadcast user online:', userId);
+        setOnlineUsers(prev => {
+          const updated = new Set(prev);
+          updated.add(userId);
+          return updated;
+        });
+      });
+
+      socketInstance.on('userOffline', (userId: string) => {
+        console.log('User went offline:', userId);
+        setOnlineUsers(prev => {
+          const updated = new Set(prev);
+          updated.delete(userId);
+          return updated;
+        });
+      });
+
+      socketInstance.on('broadcastUserOffline', (userId: string) => {
+        console.log('Received broadcast user offline:', userId);
         setOnlineUsers(prev => {
           const updated = new Set(prev);
           updated.delete(userId);
@@ -68,8 +98,14 @@ export const useSocket = (): UseSocketReturn => {
       });
 
       return () => {
-        cleanupOnline();
-        cleanupOffline();
+        socketInstance.off('connect');
+        socketInstance.off('disconnect');
+        socketInstance.off('onlineUsers');
+        socketInstance.off('broadcastOnlineUsers');
+        socketInstance.off('userOnline');
+        socketInstance.off('broadcastUserOnline');
+        socketInstance.off('userOffline');
+        socketInstance.off('broadcastUserOffline');
         disconnectSocket();
         initialized.current = false;
       };
