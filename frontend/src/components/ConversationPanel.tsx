@@ -329,19 +329,26 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           } 
           // If we received basic message info but not a complete object
           else if (messageSenderId) {
-            console.log('Fetching complete message data from server');
-            // This is a notification that a new message was created
-            // We should fetch the latest messages to get the full message
-            fetchMessages(activeConversation._id);
+            console.log('Received basic message info, adding to current conversation');
+            // Add a temporary message that will be updated when the full message is received
+            const tempMessage: Message = {
+              _id: Date.now().toString(), // Temporary ID
+              content: data.message || data.content,
+              sender: {
+                _id: messageSenderId,
+                name: data.senderName || 'Unknown',
+                username: data.senderUsername || 'unknown'
+              },
+              createdAt: new Date().toISOString(),
+              read: false
+            };
+            setMessages(prev => [...prev, tempMessage]);
           }
-        } else if (messageConversationId) {
+        } else {
           // Message is for a different conversation
           console.log('Message is for different conversation:', messageConversationId);
-          // Update that conversation's unread count or refresh the conversations list
+          // Just show a notification without refreshing conversations
           toast.info('New message in another conversation');
-          fetchConversations();
-        } else {
-          console.log('Could not determine conversation for message:', data);
         }
       });
       
