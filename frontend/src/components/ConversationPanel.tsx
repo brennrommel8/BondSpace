@@ -15,6 +15,8 @@ import {
   sendPrivateMessage,
   sendTypingIndicator,
   onTypingIndicator,
+  onMessageRead,
+  onMessageDeleted,
   sendMessageDeletionNotification,
   onIncomingCall,
   respondToCall,
@@ -62,6 +64,16 @@ interface ConversationData {
 interface ConversationPanelProps {
   conversationId?: string;
   userId: string; // Current user's ID
+}
+
+interface MessageReadData {
+  conversationId: string;
+  messageIds: string[];
+}
+
+interface MessageDeletedData {
+  conversationId: string;
+  messageId: string;
 }
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
@@ -112,7 +124,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     });
   }, [messages]);
 
-  // Setup listener for new messages
+  // Join/leave conversation room using sockets
   useEffect(() => {
     if (activeConversation) {
       console.log('Joining conversation room:', activeConversation._id);
@@ -138,7 +150,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       }
       
       // Setup listener for new messages
-      const cleanup = onNewMessage((data) => {
+      const newMessageCleanup = onNewMessage((data) => {
         console.log('New message received via socket:', data);
         
         // Handle different possible data formats
@@ -146,12 +158,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         const messageConversationId = data.conversationId || data.conversation;
         const receivedMessageObj = data.messageObj || data.messageData || data;
         
-        // If we have a valid conversation ID match and active conversation
-        if (activeConversation && messageConversationId === activeConversation._id) {
+        // If we have a valid conversation ID match
+        if (messageConversationId === activeConversation._id) {
           console.log('Message is for current conversation');
-          
-          // Refresh messages for the current conversation
-          fetchMessages(activeConversation._id);
           
           // Check if this is a complete message object we can use directly
           if (receivedMessageObj && typeof receivedMessageObj === 'object' && 
@@ -171,54 +180,64 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           } 
           // If we received basic message info but not a complete object
           else if (messageSenderId) {
-            console.log('Received basic message info, adding to current conversation');
-            // Add a temporary message that will be updated when the full message is received
-            const tempMessage: Message = {
-              _id: Date.now().toString(), // Temporary ID
-              content: data.message || data.content,
-              sender: {
-                _id: messageSenderId,
-                name: data.senderName || 'Unknown',
-                username: data.senderUsername || 'unknown'
-              },
-              createdAt: new Date().toISOString(),
-              read: false
-            };
-            setMessages(prev => [...prev, tempMessage]);
+            console.log('Fetching complete message data from server');
+            // This is a notification that a new message was created
+            // We should fetch the latest messages to get the full message
+            fetchMessages(activeConversation._id);
           }
-        } else {
+        } else if (messageConversationId) {
           // Message is for a different conversation
           console.log('Message is for different conversation:', messageConversationId);
-          
-          // Update the unread count for the conversation
-          setConversations(prev => prev.map(conv => {
-            if (conv._id === messageConversationId) {
-              return {
-                ...conv,
-                unreadCount: conv.unreadCount + 1,
-                lastMessage: {
-                  _id: Date.now().toString(),
-                  content: data.message || data.content,
-                  sender: {
-                    _id: messageSenderId,
-                    name: data.senderName || 'Unknown',
-                    username: data.senderUsername || 'unknown'
-                  },
-                  createdAt: new Date().toISOString(),
-                  read: false
-                }
-              };
+          // Update that conversation's unread count or refresh the conversations list
+          toast.info('New message in another conversation');
+          fetchConversations();
+        } else {
+          console.log('Could not determine conversation for message:', data);
+        }
+      });
+      
+      // Setup listener for message read updates
+      const readReceiptCleanup = onMessageRead((data: MessageReadData) => {
+        console.log('Message read status update received:', data);
+        
+        if (data.conversationId === activeConversation._id) {
+          // Update read status of messages in the current conversation
+          setMessages(prev => prev.map(msg => {
+            // If this message ID is in the read messages list
+            if (data.messageIds.includes(msg._id)) {
+              return { ...msg, read: true };
             }
-            return conv;
+            return msg;
           }));
-          
-          // Show notification for new message
-          toast.info('New message received');
+        } else {
+          // Update for a different conversation - refresh conversation list
+          fetchConversations();
+        }
+      });
+      
+      // Setup listener for message deletion events
+      const messageDeletionCleanup = onMessageDeleted((data: MessageDeletedData) => {
+        console.log('Message deletion event received:', data);
+        
+        if (data.conversationId === activeConversation._id) {
+          console.log('Updating UI for deleted message:', data.messageId);
+          // Mark the message as deleted in the current conversation
+          setMessages(prev => prev.map(msg => {
+            if (msg._id === data.messageId) {
+              return { ...msg, deleted: true, content: undefined, media: [] };
+            }
+            return msg;
+          }));
+        } else {
+          // Update for a different conversation - refresh conversation list
+          fetchConversations();
         }
       });
       
       return () => {
-        cleanup();
+        newMessageCleanup();
+        readReceiptCleanup();
+        messageDeletionCleanup();
         if (activeConversation) {
           leaveConversation(activeConversation._id);
         }
