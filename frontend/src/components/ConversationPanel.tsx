@@ -15,8 +15,6 @@ import {
   sendPrivateMessage,
   sendTypingIndicator,
   onTypingIndicator,
-  onMessageRead,
-  onMessageDeleted,
   sendMessageDeletionNotification,
   onIncomingCall,
   respondToCall,
@@ -28,7 +26,9 @@ import useSocket from '@/hooks/useSocket';
 import TypingIndicator from './TypingIndicator';
 import VideoCall from './VideoCall';
 import IncomingCallNotification from './IncomingCallNotification';
-import { DEFAULT_AVATAR } from '../utils/profileImageUtils';
+
+// Define default avatar path
+const DEFAULT_AVATAR = '/assets/default-profile.png';
 
 // Local interface for structured message data after transformation
 interface Message {
@@ -73,7 +73,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationData | null>(null);
   const [messageInput, setMessageInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -95,16 +94,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   } | null>(null);
   const [initiatingCall, setInitiatingCall] = useState(false);
 
-  // Add image preloading function
-  const preloadImage = (url: string) => {
-    const img = new Image();
-    img.src = url;
-    return img;
-  };
-
-  // Cache for preloaded images
-  const imageCache = new Map<string, HTMLImageElement>();
-
   // Enhanced getProfileImageUrl with preloading
   const getProfileImageUrl = (profilePicture: any): string => {
     if (!profilePicture) {
@@ -121,10 +110,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       return DEFAULT_AVATAR;
     }
 
-    // Preload the image if not in cache
-    if (!imageCache.has(imageUrl)) {
-      imageCache.set(imageUrl, preloadImage(imageUrl));
-    }
+    // Preload the image immediately
+    const img = new Image();
+    img.src = imageUrl;
     
     return imageUrl;
   };
@@ -148,6 +136,144 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       }
     });
   }, [messages]);
+
+  // Setup listener for new messages
+  useEffect(() => {
+    if (activeConversation) {
+      console.log('Joining conversation room:', activeConversation._id);
+      
+      // If socket is not connected, try to reconnect
+      if (!isConnected) {
+        console.log('Socket not connected, attempting to reconnect...');
+        forceReconnect().then(success => {
+          if (success) {
+            console.log('Socket reconnected successfully');
+            // Join the conversation after successful reconnection
+            joinConversation(activeConversation._id);
+            // Fetch messages to ensure we're up to date
+            fetchMessages(activeConversation._id);
+          } else {
+            console.error('Failed to reconnect socket');
+            toast.error('Failed to connect to chat service. Please try again.');
+          }
+        });
+      } else {
+        // If already connected, just join the conversation
+        joinConversation(activeConversation._id);
+      }
+      
+      // Setup listener for new messages
+      const cleanup = onNewMessage((data) => {
+        console.log('New message received via socket:', data);
+        
+        // Handle different possible data formats
+        const messageSenderId = data.senderId || (data.sender && (data.sender._id || data.sender));
+        const messageConversationId = data.conversationId || data.conversation;
+        const receivedMessageObj = data.messageObj || data.messageData || data;
+        
+        // If we have a valid conversation ID match and active conversation
+        if (activeConversation && messageConversationId === activeConversation._id) {
+          console.log('Message is for current conversation');
+          
+          // Refresh messages for the current conversation
+          fetchMessages(activeConversation._id);
+          
+          // Check if this is a complete message object we can use directly
+          if (receivedMessageObj && typeof receivedMessageObj === 'object' && 
+              (receivedMessageObj._id || receivedMessageObj.id)) {
+            console.log('Adding message from complete message object');
+            const newMessage = transformMessage(receivedMessageObj);
+            
+            // Only add if message doesn't already exist
+            setMessages(prev => {
+              const messageExists = prev.some(m => m._id === newMessage._id);
+              if (messageExists) {
+                console.log('Message already exists, skipping');
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
+          } 
+          // If we received basic message info but not a complete object
+          else if (messageSenderId) {
+            console.log('Received basic message info, adding to current conversation');
+            // Add a temporary message that will be updated when the full message is received
+            const tempMessage: Message = {
+              _id: Date.now().toString(), // Temporary ID
+              content: data.message || data.content,
+              sender: {
+                _id: messageSenderId,
+                name: data.senderName || 'Unknown',
+                username: data.senderUsername || 'unknown'
+              },
+              createdAt: new Date().toISOString(),
+              read: false
+            };
+            setMessages(prev => [...prev, tempMessage]);
+          }
+        } else {
+          // Message is for a different conversation
+          console.log('Message is for different conversation:', messageConversationId);
+          // Refresh conversations to update the last message
+          fetchConversations();
+          toast.info('New message in another conversation');
+        }
+      });
+      
+      return () => {
+        cleanup();
+        if (activeConversation) {
+          leaveConversation(activeConversation._id);
+        }
+      };
+    }
+  }, [activeConversation, isConnected]);
+
+  // Preload all images immediately
+  const preloadAllImages = (conversations: ConversationData[], messages: Message[]) => {
+    // Create a Set to store unique image URLs
+    const imageUrls = new Set<string>();
+
+    // Add profile pictures from conversations
+    conversations.forEach(conversation => {
+      conversation.participants.forEach(participant => {
+        if (participant.profilePicture) {
+          const url = getProfileImageUrl(participant.profilePicture);
+          imageUrls.add(url);
+        }
+      });
+    });
+
+    // Add profile pictures from messages
+    messages.forEach(message => {
+      if (message.sender.profilePicture) {
+        const url = getProfileImageUrl(message.sender.profilePicture);
+        imageUrls.add(url);
+      }
+      // Add message media images
+      if (message.media) {
+        message.media.forEach(media => {
+          if (media.mediaType === 'image') {
+            imageUrls.add(media.url);
+          }
+          if (media.thumbnail) {
+            imageUrls.add(media.thumbnail);
+          }
+        });
+      }
+    });
+
+    // Preload all images simultaneously
+    imageUrls.forEach(url => {
+      const img = new Image();
+      img.src = url;
+    });
+  };
+
+  // Preload images whenever conversations or messages change
+  useEffect(() => {
+    preloadAllImages(conversations, messages);
+  }, [conversations, messages]);
 
   // Transform API message to local format
   const transformMessage = (apiMsg: ApiMessage): Message => {
@@ -335,138 +461,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     }
   }, [conversationId, conversations]);
 
-  // Join/leave conversation room using sockets
-  useEffect(() => {
-    if (activeConversation) {
-      console.log('Joining conversation room:', activeConversation._id);
-      
-      // If socket is not connected, try to reconnect
-      if (!isConnected) {
-        console.log('Socket not connected, attempting to reconnect...');
-        forceReconnect().then(success => {
-          if (success) {
-            console.log('Socket reconnected successfully');
-            // Join the conversation after successful reconnection
-            joinConversation(activeConversation._id);
-            // Fetch messages to ensure we're up to date
-            fetchMessages(activeConversation._id);
-          } else {
-            console.error('Failed to reconnect socket');
-            toast.error('Failed to connect to chat service. Please try again.');
-          }
-        });
-      } else {
-        // If already connected, just join the conversation
-        joinConversation(activeConversation._id);
-      }
-      
-      // Setup listener for new messages
-      const newMessageCleanup = onNewMessage((data) => {
-        console.log('New message received via socket:', data);
-        
-        // Handle different possible data formats
-        const messageSenderId = data.senderId || (data.sender && (data.sender._id || data.sender));
-        const messageConversationId = data.conversationId || data.conversation;
-        const receivedMessageObj = data.messageObj || data.messageData || data;
-        
-        // If we have a valid conversation ID match
-        if (messageConversationId === activeConversation._id) {
-          console.log('Message is for current conversation');
-          
-          // Refresh messages for the current conversation
-          fetchMessages(activeConversation._id);
-          
-          // Check if this is a complete message object we can use directly
-          if (receivedMessageObj && typeof receivedMessageObj === 'object' && 
-              (receivedMessageObj._id || receivedMessageObj.id)) {
-            console.log('Adding message from complete message object');
-            const newMessage = transformMessage(receivedMessageObj);
-            
-            // Only add if message doesn't already exist
-            setMessages(prev => {
-              const messageExists = prev.some(m => m._id === newMessage._id);
-              if (messageExists) {
-                console.log('Message already exists, skipping');
-                return prev;
-              }
-              return [...prev, newMessage];
-            });
-          } 
-          // If we received basic message info but not a complete object
-          else if (messageSenderId) {
-            console.log('Received basic message info, adding to current conversation');
-            // Add a temporary message that will be updated when the full message is received
-            const tempMessage: Message = {
-              _id: Date.now().toString(), // Temporary ID
-              content: data.message || data.content,
-              sender: {
-                _id: messageSenderId,
-                name: data.senderName || 'Unknown',
-                username: data.senderUsername || 'unknown'
-              },
-              createdAt: new Date().toISOString(),
-              read: false
-            };
-            setMessages(prev => [...prev, tempMessage]);
-          }
-        } else {
-          // Message is for a different conversation
-          console.log('Message is for different conversation:', messageConversationId);
-          // Refresh conversations to update the last message
-          fetchConversations();
-          toast.info('New message in another conversation');
-        }
-      });
-      
-      // Setup listener for message read updates
-      const readReceiptCleanup = onMessageRead((data) => {
-        console.log('Message read status update received:', data);
-        
-        if (data.conversationId === activeConversation._id) {
-          // Update read status of messages in the current conversation
-          setMessages(prev => prev.map(msg => {
-            // If this message ID is in the read messages list
-            if (data.messageIds.includes(msg._id)) {
-              return { ...msg, read: true };
-            }
-            return msg;
-          }));
-        } else {
-          // Update for a different conversation - refresh conversation list
-          fetchConversations();
-        }
-      });
-      
-      // Setup listener for message deletion events
-      const messageDeletionCleanup = onMessageDeleted((data) => {
-        console.log('Message deletion event received:', data);
-        
-        if (data.conversationId === activeConversation._id) {
-          console.log('Updating UI for deleted message:', data.messageId);
-          // Mark the message as deleted in the current conversation
-          setMessages(prev => prev.map(msg => {
-            if (msg._id === data.messageId) {
-              return { ...msg, deleted: true, content: undefined, media: [] };
-            }
-            return msg;
-          }));
-        } else {
-          // Update for a different conversation - refresh conversation list
-          fetchConversations();
-        }
-      });
-      
-      return () => {
-        newMessageCleanup();
-        readReceiptCleanup();
-        messageDeletionCleanup();
-        if (activeConversation) {
-          leaveConversation(activeConversation._id);
-        }
-      };
-    }
-  }, [activeConversation, isConnected]);
-
   // Scroll to bottom of message list when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -474,7 +468,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   const fetchConversations = async () => {
     try {
-      setLoading(true);
       console.log('Fetching conversations...');
       const response = await chatApi.getConversations();
       console.log('API response for conversations:', response);
@@ -484,24 +477,32 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         const transformedConvs = response.conversations.map(transformConversation);
         console.log('Transformed conversations:', transformedConvs);
         setConversations(transformedConvs);
+        // Preload images immediately after setting conversations
+        preloadAllImages(transformedConvs, messages);
       } else {
         console.warn('No conversations returned from API:', response);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
       toast.error('Failed to load conversations');
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchMessages = async (convId: string) => {
     try {
-      setLoading(true);
       const response = await chatApi.getMessages(convId);
       if (response.success && response.messages) {
         // Transform API messages to local format
         const transformedMsgs = response.messages.map(transformMessage);
+        
+        // Preload all profile pictures before setting messages
+        transformedMsgs.forEach(message => {
+          if (message.sender.profilePicture) {
+            const img = new Image();
+            img.src = getProfileImageUrl(message.sender.profilePicture);
+          }
+        });
+        
         console.log("Fetched Messages:", response.messages);
         console.log("Transformed Messages:", transformedMsgs);
         console.log("Current User ID:", userId);
@@ -514,8 +515,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast.error('Failed to load messages');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1082,11 +1081,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         </div>
 
         {/* Search and filter options could go here */}
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-          </div>
-        ) : conversations.length === 0 ? (
+        {conversations.length === 0 ? (
           <div className="flex-1 flex items-center justify-center p-6 text-center">
             <div>
               <div className="mx-auto bg-emerald-100 p-3 rounded-full mb-3 inline-block">
@@ -1294,7 +1289,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                     );
                   })}
                   
-                  {/* Typing indicator */}
                   {renderTypingIndicators()}
                   
                   <div ref={messagesEndRef} />
