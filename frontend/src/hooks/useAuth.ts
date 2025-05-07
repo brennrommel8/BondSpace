@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { authApi } from '@/api/authApi';
 import { toast } from 'sonner';
-import { initializeSocket, refreshSocketConnection } from '@/utils/socketUtils';
+import { initializeSocket } from '@/utils/socketUtils';
 
 export const useAuth = () => {
   const { user, setUser } = useUserStore();
@@ -67,12 +67,27 @@ export const useAuth = () => {
         setUser(response.user);
         setAuthChecked(true);
         
-        // Initialize socket connection after successful login
-        console.log('Initializing socket connection after login');
-        setTimeout(() => {
-          // Small delay to ensure token is properly stored before attempting socket connection
-          refreshSocketConnection();
-        }, 500);
+        // Initialize socket connection and set online status immediately
+        console.log('Setting up socket connection and online status');
+        const socket = initializeSocket();
+        
+        if (socket) {
+          // Get user ID from the response
+          const userId = response.user._id;
+          
+          // Set up socket connection and online status
+          socket.once('connect', () => {
+            // Join user's personal room
+            socket.emit('join', userId);
+            // Set online status
+            socket.emit('userOnline', userId);
+            // Get list of online users
+            socket.emit('requestOnlineUsers');
+          });
+          
+          // Connect the socket
+          socket.connect();
+        }
         
         toast.success('Logged in successfully');
         return true;

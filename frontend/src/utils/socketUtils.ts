@@ -115,6 +115,20 @@ export const initializeSocket = (): Socket | null => {
             
             // Request current list of online users
             socket.emit('requestOnlineUsers');
+            
+            // Set up periodic online status refresh
+            const onlineStatusInterval = setInterval(() => {
+              if (socket?.connected) {
+                socket.emit('userOnline', userId);
+              } else {
+                clearInterval(onlineStatusInterval);
+              }
+            }, 30000); // Refresh every 30 seconds
+            
+            // Clean up interval on disconnect
+            socket?.on('disconnect', () => {
+              clearInterval(onlineStatusInterval);
+            });
           } catch (error) {
             console.error('Error decoding token:', error);
           }
