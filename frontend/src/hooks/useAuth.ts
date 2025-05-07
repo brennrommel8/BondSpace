@@ -2,13 +2,33 @@ import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { authApi } from '@/api/authApi';
 import { toast } from 'sonner';
-import { initializeSocket } from '@/utils/socketUtils';
+import { initializeSocket, getSocket } from '@/utils/socketUtils';
 
 export const useAuth = () => {
   const { user, setUser } = useUserStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+
+  // Add cleanup effect for when user leaves the app
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const socket = getSocket();
+      if (socket && user?._id) {
+        socket.emit('userOffline', user._id);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Also handle offline status when component unmounts
+      const socket = getSocket();
+      if (socket && user?._id) {
+        socket.emit('userOffline', user._id);
+      }
+    };
+  }, [user?._id]);
 
   // Use useCallback to memoize the checkAuthStatus function
   const checkAuthStatus = useCallback(async () => {
@@ -110,6 +130,12 @@ export const useAuth = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Set offline status before logging out
+      const socket = getSocket();
+      if (socket && user?._id) {
+        socket.emit('userOffline', user._id);
+      }
       
       await authApi.logout();
       setUser(null);
