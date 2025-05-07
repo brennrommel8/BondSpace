@@ -103,11 +103,23 @@ export const initializeSocket = (): Socket | null => {
         
         // Request a list of online users (with null check)
         if (socket) {
-          // Notify server that this user is online
-          socket.emit('userOnline');
-          
-          // Request current list of online users
-          socket.emit('requestOnlineUsers');
+          // Get the user ID from the token
+          const token = getAuthToken();
+          if (token) {
+            try {
+              // Decode the JWT token to get the user ID
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              const userId = payload.id || payload._id;
+              
+              // Notify server that this user is online with their ID
+              socket.emit('userOnline', userId);
+              
+              // Request current list of online users
+              socket.emit('requestOnlineUsers');
+            } catch (error) {
+              console.error('Error decoding token:', error);
+            }
+          }
           
           // Also join any active conversation if the ID is in localStorage
           const activeConversationId = localStorage.getItem('activeConversationId');
@@ -172,9 +184,19 @@ export const initializeSocket = (): Socket | null => {
       socket.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason, new Date().toISOString());
         
-        // Notify server that this user is offline
+        // Notify server that this user is offline with their ID
         if (socket) {
-          socket.emit('userOffline');
+          const token = getAuthToken();
+          if (token) {
+            try {
+              // Decode the JWT token to get the user ID
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              const userId = payload.id || payload._id;
+              socket.emit('userOffline', userId);
+            } catch (error) {
+              console.error('Error decoding token:', error);
+            }
+          }
         }
         
         // If server disconnected us, try to reconnect
