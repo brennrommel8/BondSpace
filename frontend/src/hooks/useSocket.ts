@@ -14,8 +14,8 @@ interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
   onlineUsers: Set<string>;
-  setIsConnected: (connected: boolean) => void;
   forceReconnect: () => Promise<boolean>;
+  initializeSocketConnection: () => void;
 }
 
 /**
@@ -29,35 +29,27 @@ export const useSocket = (): UseSocketReturn => {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const initialized = useRef<boolean>(false);
 
-  // Clear socketio_available on first run to ensure a fresh connection attempt
-  useEffect(() => {
-    // Don't automatically reset availability - this was causing refresh loops
-    // if (!initialized.current && typeof localStorage !== 'undefined') {
-    //   resetSocketAvailability();
-    // }
-  }, []);
-
-  useEffect(() => {
+  // Only initialize socket when explicitly requested
+  const initializeSocketConnection = () => {
     if (!user || initialized.current) return;
 
-    // Initialize and get socket instance
-    const socketInstance = initializeSocket();
-    setSocket(socketInstance);
-    
+    const socketInstance = getSocket() || initializeSocket();
     if (socketInstance) {
+      setSocket(socketInstance);
+      setIsConnected(socketInstance.connected);
       initialized.current = true;
-      
+
       // Set up connection status listeners
       socketInstance.on('connect', () => {
         console.log('Socket connected in hook');
         setIsConnected(true);
       });
-      
+
       socketInstance.on('disconnect', () => {
         console.log('Socket disconnected in hook');
         setIsConnected(false);
       });
-      
+
       // Track online users
       const cleanupOnline = onUserOnline((userId: string) => {
         setOnlineUsers(prev => {
@@ -66,7 +58,7 @@ export const useSocket = (): UseSocketReturn => {
           return updated;
         });
       });
-      
+
       const cleanupOffline = onUserOffline((userId: string) => {
         setOnlineUsers(prev => {
           const updated = new Set(prev);
@@ -74,7 +66,7 @@ export const useSocket = (): UseSocketReturn => {
           return updated;
         });
       });
-      
+
       return () => {
         cleanupOnline();
         cleanupOffline();
@@ -82,49 +74,32 @@ export const useSocket = (): UseSocketReturn => {
         initialized.current = false;
       };
     }
-  }, [user]);
+  };
 
-  // Reconnect when user changes or when the component re-renders if we lost connection
-  useEffect(() => {
-    if (user && !socket) {
-      const socketInstance = getSocket();
-      setSocket(socketInstance);
-      
-      if (socketInstance) {
-        setIsConnected(socketInstance.connected);
-        console.log('Socket reconnected, connected status:', socketInstance.connected);
-      }
-    }
-  }, [user, socket]);
-
-  // Update isConnected when socket connects/disconnects
+  // Update connection status when socket state changes
   useEffect(() => {
     if (socket) {
       setIsConnected(socket.connected);
     }
   }, [socket]);
 
-  // Expose forceReconnect as a method that components can use
+  // Force reconnect function
   const handleForceReconnect = async (): Promise<boolean> => {
-    // Attempt to reconnect the socket
     const success = await forceSocketReconnect();
-    
-    // Update local socket reference if reconnection was successful
     if (success) {
       const socketInstance = getSocket();
       setSocket(socketInstance);
       setIsConnected(!!socketInstance?.connected);
     }
-    
     return success;
   };
 
   return { 
     socket, 
     isConnected, 
-    onlineUsers, 
-    setIsConnected,
-    forceReconnect: handleForceReconnect
+    onlineUsers,
+    forceReconnect: handleForceReconnect,
+    initializeSocketConnection
   };
 };
 

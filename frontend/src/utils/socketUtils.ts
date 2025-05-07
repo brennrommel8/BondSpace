@@ -5,13 +5,14 @@ import { Message } from '@/api/chatApi';
 
 // Socket connection options
 const SOCKET_OPTIONS = {
-  reconnectionAttempts: 5,      // Increase retry attempts
-  reconnectionDelay: 1000,      // Shorter delay between attempts
-  timeout: 10000,               // Longer timeout for better connection chance
-  autoConnect: false,           // Don't connect automatically - we'll do it manually
-  path: '/socket.io',           // Socket.IO default path
-  forceNew: true,               // Force a new connection on each attempt
-  withCredentials: true,        // Send cookies for cross-site requests
+  reconnectionAttempts: Infinity,  // Keep trying to reconnect indefinitely
+  reconnectionDelay: 1000,         // Start with 1 second delay
+  reconnectionDelayMax: 5000,      // Max 5 seconds between attempts
+  timeout: 20000,                  // Longer timeout for better connection chance
+  autoConnect: true,               // Enable automatic connection
+  path: '/socket.io',              // Socket.IO default path
+  forceNew: true,                  // Force a new connection on each attempt
+  withCredentials: true,           // Send cookies for cross-site requests
   transports: ['websocket', 'polling']  // Try websocket first, then fall back to polling
 };
 
@@ -93,11 +94,10 @@ export const initializeSocket = (): Socket | null => {
         ...SOCKET_OPTIONS,
         auth: { token }, // Backend looks for socket.handshake.auth.token
         query: { token }, // Some backends look for token in query params
-        reconnectionAttempts: 10, // Increase reconnection attempts
-        reconnectionDelay: 1000, // Start with a 1 second delay
-        reconnectionDelayMax: 5000, // Max delay between reconnection attempts
-        timeout: 20000, // Longer timeout for better connection chance
       });
+
+      // Connect immediately
+      socket.connect();
       
       // Set up event listeners
       socket.on('connect', () => {
@@ -190,9 +190,6 @@ export const initializeSocket = (): Socket | null => {
       socket.on('onlineUsers', (users: string[]) => {
         console.log('Received online users list:', users);
       });
-      
-      // Connect manually
-      socket.connect();
     } catch (err) {
       console.error('Error creating socket connection:', err);
       socket = null;
@@ -230,10 +227,19 @@ export const getSocket = (): Socket | null => {
     return null;
   }
   
-  if (!socket || !socket.connected) {
-    return initializeSocket();
+  // If socket exists and is connected, return it
+  if (socket && socket.connected) {
+    return socket;
   }
-  return socket;
+  
+  // If socket exists but isn't connected, try to connect it
+  if (socket && !socket.connected) {
+    socket.connect();
+    return socket;
+  }
+  
+  // If no socket exists, initialize a new one
+  return initializeSocket();
 };
 
 // Add a function to check if the Socket.IO server is available

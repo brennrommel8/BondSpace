@@ -1,8 +1,6 @@
 import api from '@/config/axios';
 import axios from 'axios';
-
-// Hardcoded API URL
-const API_URL = 'https://socmed-backend-8q7a.onrender.com/api';
+import { API_ENDPOINTS } from '@/config/api';
 
 export interface SignUpData {
   name: string
@@ -74,7 +72,7 @@ export const authApi = {
   signUp: async (data: SignUpData): Promise<SignUpResponse> => {
     try {
       console.log('Sending signup request with data:', data)
-      const response = await api.post<SignUpResponse>(API_URL + '/auth/register', data)
+      const response = await api.post<SignUpResponse>(`${API_ENDPOINTS.API}/auth/register`, data)
       console.log('Signup response:', response.data)
       return response.data
     } catch (error) {
@@ -94,7 +92,7 @@ export const authApi = {
 
   login: async (credentials: LoginInput): Promise<LoginResponse> => {
     try {
-      const response = await api.post<LoginResponse>(API_URL + '/auth/login', credentials)
+      const response = await api.post<LoginResponse>(`${API_ENDPOINTS.API}/auth/login`, credentials)
       return response.data
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -106,7 +104,7 @@ export const authApi = {
 
   logout: async () => {
     try {
-      const response = await api.get(API_URL + '/auth/logout')
+      const response = await api.get(`${API_ENDPOINTS.API}/auth/logout`)
       return response.data
     } catch (error) {
       throw error
@@ -116,7 +114,7 @@ export const authApi = {
   getMe: async (): Promise<ApiResponse<UserProfile>> => {
     try {
       console.log('Fetching current user profile');
-      const response = await api.get<ApiResponse<UserProfile>>(API_URL + '/auth/me');
+      const response = await api.get<ApiResponse<UserProfile>>(`${API_ENDPOINTS.API}/auth/me`);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -131,7 +129,7 @@ export const authApi = {
     try {
       console.log('Sending update request with data:', data)
       const response = await api.put(
-        API_URL + '/auth/profile',
+        `${API_ENDPOINTS.API}/auth/profile`,
         {
           name: data.name,
           username: data.username,
@@ -154,7 +152,7 @@ export const authApi = {
     try {
       console.log('Sending change password request with data:', data)
       const response = await api.put(
-        API_URL + '/auth/password',
+        `${API_ENDPOINTS.API}/auth/password`,
         {
           currentPassword: data.currentPassword,
           newPassword: data.newPassword,

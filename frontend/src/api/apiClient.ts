@@ -1,9 +1,10 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { API_ENDPOINTS } from '@/config/api';
 
 // Create axios instance
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://socmed-backend-8q7a.onrender.com',
+  baseURL: import.meta.env.VITE_API_URL || API_ENDPOINTS.API,
   headers: {
     'Content-Type': 'application/json',
   }

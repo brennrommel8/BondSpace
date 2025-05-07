@@ -1,7 +1,6 @@
 import api from '@/config/axios'
 import axios from 'axios'
-
-const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
+import { API_ENDPOINTS } from '@/config/api'
 
 interface ProfilePictureResponse {
   success: boolean;
@@ -30,7 +29,7 @@ export const profileApi = {
       formData.append('profilePicture', file);
 
       const response = await api.post<ProfilePictureResponse>(
-        `${API_URL}/profile/upload-profile-picture`,
+        `${API_ENDPOINTS.API}/profile/upload-profile-picture`,
         formData,
         {
           headers: {
@@ -54,7 +53,7 @@ export const profileApi = {
     try {
       console.log(`Making API request to update visibility to: ${visibility}`)
       const response = await api.put<UpdateVisibilityResponse>(
-        `${API_URL}/users/posts/visibility`,
+        `${API_ENDPOINTS.API}/users/posts/visibility`,
         { visibility },
         {
           headers: {

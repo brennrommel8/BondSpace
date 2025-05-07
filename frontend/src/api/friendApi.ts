@@ -1,7 +1,6 @@
 import axios from 'axios'
-import api from '@/config/axios';
-
-const API_URL = 'https://socmed-backend-8q7a.onrender.com/api'
+import api from '@/config/axios'
+import { API_ENDPOINTS } from '@/config/api'
 
 export interface FriendResponse {
   success: boolean
@@ -40,7 +39,7 @@ export interface FriendOperationsStatus {
 
 // Create a custom axios instance for friend request operations
 const friendRequestAxios = axios.create({
-  baseURL: API_URL,
+  baseURL: API_ENDPOINTS.API,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -97,7 +96,7 @@ export const friendApi = {
 
       console.log('Sending friend request to userId:', userId)
       const response = await api.post<FriendResponse>(
-        `${API_URL}/friends/friend-requests`,
+        `${API_ENDPOINTS.API}/friends/friend-requests`,
         { userId },
         {
           withCredentials: true,
@@ -143,7 +142,7 @@ export const friendApi = {
 
       console.log('Accepting friend request from userId:', userId)
       const response = await api.post<FriendResponse>(
-        `${API_URL}/friends/friend-requests/${userId}`,
+        `${API_ENDPOINTS.API}/friends/friend-requests/${userId}`,
         { userId },
         {
           withCredentials: true,
@@ -171,41 +170,40 @@ export const friendApi = {
     }
   },
 
-  // Then update the rejectFriendRequest method
-rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
-  try {
-    if (!userId) throw new Error('userId is required');
+  rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
+    try {
+      if (!userId) throw new Error('userId is required');
 
-    const response = await api.delete<FriendResponse>(
-      `${API_URL}/friends/friend-requests/${userId}`,
-      { withCredentials: true }
-    );
+      const response = await api.delete<FriendResponse>(
+        `${API_ENDPOINTS.API}/friends/friend-requests/${userId}`,
+        { withCredentials: true }
+      );
 
-    // Handle cases where request was already removed
-    if (response.status === 404) {
-      return {
-        success: true,
-        message: 'Request already cancelled',
-        data: { rejectedUser: { id: userId, username: '' } }
-      };
+      // Handle cases where request was already removed
+      if (response.status === 404) {
+        return {
+          success: true,
+          message: 'Request already cancelled',
+          data: { rejectedUser: { id: userId, username: '' } }
+        };
+      }
+
+      return response.data;
+    } catch (error) {
+      const message = handleApiError(error, 'Failed to reject friend request');
+      
+      // Special case for 404 - treat as success (idempotent operation)
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return {
+          success: true,
+          message: 'Request already cancelled',
+          data: { rejectedUser: { id: userId, username: '' } }
+        };
+      }
+
+      throw new Error(message);
     }
-
-    return response.data;
-  } catch (error) {
-    const message = handleApiError(error, 'Failed to reject friend request');
-    
-    // Special case for 404 - treat as success (idempotent operation)
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return {
-        success: true,
-        message: 'Request already cancelled',
-        data: { rejectedUser: { id: userId, username: '' } }
-      };
-    }
-
-    throw new Error(message);
-  }
-},
+  },
 
   removeFriend: async (userId: string): Promise<FriendResponse> => {
     try {
@@ -215,10 +213,10 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
       }
 
       console.log('Remove friend - userId:', userId)
-      console.log('Remove friend - URL:', `${API_URL}/friends/${userId}`)
+      console.log('Remove friend - URL:', `${API_ENDPOINTS.API}/friends/${userId}`)
       
       const response = await api.delete<FriendResponse>(
-        `${API_URL}/friends/${userId}`,
+        `${API_ENDPOINTS.API}/friends/${userId}`,
         {
           withCredentials: true,
           headers: {
@@ -261,7 +259,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
     try {
       console.log('Fetching friend requests')
       const response = await api.get<FriendResponse & { data: Friend[] }>(
-        `${API_URL}/friends/friend-requests`,
+        `${API_ENDPOINTS.API}/friends/friend-requests`,
         {
           withCredentials: true,
           headers: {
@@ -289,7 +287,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
     try {
       console.log('Fetching friends')
       const response = await api.get<FriendResponse & { data: Friend[] }>(
-        `${API_URL}/friends`,
+        `${API_ENDPOINTS.API}/friends`,
         {
           withCredentials: true,
           headers: {
@@ -317,7 +315,7 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
     try {
       console.log('Fetching friend operations status')
       const response = await api.get<FriendResponse & { data: FriendOperationsStatus }>(
-        `${API_URL}/friends/operations/status`,
+        `${API_ENDPOINTS.API}/friends/operations/status`,
         {
           withCredentials: true,
           headers: {
@@ -336,4 +334,4 @@ rejectFriendRequest: async (userId: string): Promise<FriendResponse> => {
       throw error
     }
   }
-} 
+}; 

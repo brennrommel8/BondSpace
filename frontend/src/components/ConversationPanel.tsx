@@ -68,7 +68,7 @@ interface ConversationPanelProps {
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
   const { user } = useUserStore(); // Get current user from store
-  const { isConnected, onlineUsers, setIsConnected, forceReconnect } = useSocket(); // Use our socket hook
+  const { isConnected, onlineUsers, forceReconnect, initializeSocketConnection } = useSocket(); // Use our socket hook
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationData | null>(null);
@@ -256,6 +256,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       
       if (selected) {
         setActiveConversation(selected);
+        // Initialize socket connection when opening a conversation
+        initializeSocketConnection();
         fetchMessages(selected._id);
       } else {
         console.log('Conversation not found in list');
@@ -263,6 +265,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     } else if (conversations.length > 0 && !activeConversation) {
       console.log('Setting first conversation as active');
       setActiveConversation(conversations[0]);
+      // Initialize socket connection when opening a conversation
+      initializeSocketConnection();
       fetchMessages(conversations[0]._id);
     } else {
       console.log('No conversations available or already have active conversation');
@@ -271,9 +275,28 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   // Join/leave conversation room using sockets
   useEffect(() => {
-    if (activeConversation && isConnected) {
+    if (activeConversation) {
       console.log('Joining conversation room:', activeConversation._id);
-      joinConversation(activeConversation._id);
+      
+      // If socket is not connected, try to reconnect
+      if (!isConnected) {
+        console.log('Socket not connected, attempting to reconnect...');
+        forceReconnect().then(success => {
+          if (success) {
+            console.log('Socket reconnected successfully');
+            // Join the conversation after successful reconnection
+            joinConversation(activeConversation._id);
+            // Fetch messages to ensure we're up to date
+            fetchMessages(activeConversation._id);
+          } else {
+            console.error('Failed to reconnect socket');
+            toast.error('Failed to connect to chat service. Please try again.');
+          }
+        });
+      } else {
+        // If already connected, just join the conversation
+        joinConversation(activeConversation._id);
+      }
       
       // Setup listener for new messages
       const newMessageCleanup = onNewMessage((data) => {
@@ -360,11 +383,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       });
       
       return () => {
-        // Clean up listeners when unmounting or changing conversations
         newMessageCleanup();
         readReceiptCleanup();
         messageDeletionCleanup();
-        leaveConversation(activeConversation._id);
+        if (activeConversation) {
+          leaveConversation(activeConversation._id);
+        }
       };
     }
   }, [activeConversation, isConnected]);
@@ -533,6 +557,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   const selectConversation = (conversation: ConversationData) => {
     setActiveConversation(conversation);
+    // Initialize socket connection when opening a conversation
+    initializeSocketConnection();
     fetchMessages(conversation._id);
     // Hide conversation list on mobile when a conversation is selected
     if (window.innerWidth < 768) {
@@ -956,44 +982,14 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     }
   }, [isConnected, user]);
 
-  // Add a socket reconnection button in the UI
-  const handleReconnectSocket = () => {
-    console.log('User manually triggered socket reconnection');
-    setIsConnected(false); // Show reconnecting state
-    
-    // Force socket reconnection
-    forceReconnect().then(success => {
-      console.log('Socket reconnection attempt result:', success);
-      setIsConnected(success);
-      
-      if (success && activeConversation) {
-        // Rejoin the conversation room
-        joinConversation(activeConversation._id);
-        // Fetch messages to ensure we're up to date
-        fetchMessages(activeConversation._id);
-        toast.success('Reconnected successfully');
-      } else {
-        toast.error('Failed to reconnect. Please try again.');
-      }
-    });
-  };
-
   // Add this to the rendering of the conversations list (sidebar)
   const renderSocketStatus = () => {
     return (
       <div className="flex items-center space-x-2 py-2 px-4 border-t">
         <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
         <span className="text-xs text-gray-500">
-          {isConnected ? 'Connected' : 'Disconnected'}
+          {isConnected ? 'Connected' : 'Connecting...'}
         </span>
-        {!isConnected && (
-          <button
-            onClick={handleReconnectSocket}
-            className="ml-auto text-xs bg-emerald-500 hover:bg-emerald-600 text-white py-1 px-2 rounded"
-          >
-            Reconnect
-          </button>
-        )}
       </div>
     );
   };
