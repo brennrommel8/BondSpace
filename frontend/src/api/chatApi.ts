@@ -43,7 +43,7 @@ export interface Conversation {
 
 interface PaginationInfo {
   page: number;
-  limit: number;
+  limit: number;    
   total: number;
   pages: number;
 }
