@@ -106,7 +106,19 @@ export const initializeSocket = (): Socket | null => {
           try {
             const payload = JSON.parse(atob(token.split('.')[1]));
             const userId = payload.id || payload._id;
+            
+            // Join user's personal room
             socket.emit('join', userId);
+            
+            // Explicitly request online users list
+            socket.emit('requestOnlineUsers');
+            
+            // Also join any active conversation if the ID is in localStorage
+            const activeConversationId = localStorage.getItem('activeConversationId');
+            if (activeConversationId) {
+              console.log('Rejoining conversation room from localStorage:', activeConversationId);
+              socket.emit('joinConversation', activeConversationId);
+            }
           } catch (error) {
             console.error('Error decoding token:', error);
           }
@@ -203,6 +215,22 @@ export const initializeSocket = (): Socket | null => {
       socket.on('userOffline', (userId: string) => {
         console.log('User went offline:', userId);
         // Update the online users state in the hook
+        socket?.emit('userOfflineReceived', userId);
+      });
+
+      // Listen for broadcast events
+      socket.on('broadcastOnlineUsers', (users: string[]) => {
+        console.log('Received broadcast online users:', users);
+        socket?.emit('onlineUsersReceived', users);
+      });
+
+      socket.on('broadcastUserOnline', (userId: string) => {
+        console.log('Received broadcast user online:', userId);
+        socket?.emit('userOnlineReceived', userId);
+      });
+
+      socket.on('broadcastUserOffline', (userId: string) => {
+        console.log('Received broadcast user offline:', userId);
         socket?.emit('userOfflineReceived', userId);
       });
     } catch (err) {
