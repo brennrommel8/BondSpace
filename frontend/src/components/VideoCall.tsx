@@ -95,6 +95,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
         // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
           if (event.candidate) {
+            console.log('Sending ICE candidate:', event.candidate);
             socket.emit('signalData', {
               to: remoteUserId,
               type: 'ice-candidate',
@@ -126,6 +127,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
         
         // Handle remote tracks
         peerConnection.ontrack = (event) => {
+          console.log('Received remote track:', event.streams[0]);
           const remote = new MediaStream();
           event.streams[0].getTracks().forEach(track => {
             remote.addTrack(track);
@@ -146,11 +148,17 @@ const VideoCall: React.FC<VideoCallProps> = ({
           try {
             if (data.roomId !== roomId) return;
             
+            console.log('Received signal:', data.type);
+            
             if (data.type === 'offer') {
+              console.log('Received offer, setting remote description');
               await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
+              console.log('Creating answer');
               const answer = await peerConnection.createAnswer();
+              console.log('Setting local description (answer)');
               await peerConnection.setLocalDescription(answer);
               
+              console.log('Sending answer');
               socket.emit('signalData', {
                 to: remoteUserId,
                 type: 'answer',
@@ -159,9 +167,11 @@ const VideoCall: React.FC<VideoCallProps> = ({
               });
             } 
             else if (data.type === 'answer') {
+              console.log('Received answer, setting remote description');
               await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
             } 
             else if (data.type === 'ice-candidate') {
+              console.log('Received ICE candidate, adding to peer connection');
               try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
               } catch (err) {
@@ -178,9 +188,22 @@ const VideoCall: React.FC<VideoCallProps> = ({
         socket.on('callEnded', () => {
           endCall();
         });
+
+        // Handle user joined call event
+        socket.on('userJoinedCall', (data) => {
+          console.log('User joined call:', data);
+          if (data.roomId === roomId) {
+            // If we're the one who initiated the call, create and send the offer
+            if (!isIncoming && isAnswered) {
+              console.log('Creating offer for outgoing call');
+              createOffer();
+            }
+          }
+        });
         
-        // Initiate call if not an incoming call
+        // If we're the one who initiated the call, create and send the offer immediately
         if (!isIncoming && isAnswered) {
+          console.log('Creating offer for outgoing call');
           createOffer();
         }
       } catch (error) {
@@ -203,14 +226,17 @@ const VideoCall: React.FC<VideoCallProps> = ({
     try {
       if (!peerConnectionRef.current || !socketRef.current) return;
       
+      console.log('Creating offer...');
       const offer = await peerConnectionRef.current.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
         iceRestart: true
       });
       
+      console.log('Setting local description (offer)');
       await peerConnectionRef.current.setLocalDescription(offer);
       
+      console.log('Sending offer');
       socketRef.current.emit('signalData', {
         to: remoteUserId,
         type: 'offer',
