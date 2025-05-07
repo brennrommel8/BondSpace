@@ -103,6 +103,10 @@ export const initializeSocket = (): Socket | null => {
         
         // Request a list of online users (with null check)
         if (socket) {
+          // Notify server that this user is online
+          socket.emit('userOnline');
+          
+          // Request current list of online users
           socket.emit('requestOnlineUsers');
           
           // Also join any active conversation if the ID is in localStorage
@@ -167,6 +171,11 @@ export const initializeSocket = (): Socket | null => {
       
       socket.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason, new Date().toISOString());
+        
+        // Notify server that this user is offline
+        if (socket) {
+          socket.emit('userOffline');
+        }
         
         // If server disconnected us, try to reconnect
         if (reason === 'io server disconnect') {
