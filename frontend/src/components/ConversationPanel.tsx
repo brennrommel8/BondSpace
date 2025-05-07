@@ -4,7 +4,6 @@ import { Send, Paperclip, X, Play, Users, ChevronLeft, Trash2, Video, MessageSqu
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { getProfileImageUrl } from '@/utils/profileImageUtils';
 import { chatApi, Conversation, Message as ApiMessage, Media } from '@/api/chatApi';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +28,7 @@ import useSocket from '@/hooks/useSocket';
 import TypingIndicator from './TypingIndicator';
 import VideoCall from './VideoCall';
 import IncomingCallNotification from './IncomingCallNotification';
+import { DEFAULT_AVATAR } from '../utils/profileImageUtils';
 
 // Local interface for structured message data after transformation
 interface Message {
@@ -146,6 +146,23 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       unreadCount: 0,
       updatedAt: apiConv.updatedAt
     };
+  };
+
+  // Helper function to get profile image URL
+  const getProfileImageUrl = (profilePicture: any): string => {
+    if (!profilePicture) {
+      return DEFAULT_AVATAR;
+    }
+    
+    if (typeof profilePicture === 'string') {
+      return profilePicture;
+    }
+    
+    if (profilePicture.url) {
+      return profilePicture.url;
+    }
+    
+    return DEFAULT_AVATAR;
   };
 
   // Debug helper to print simplified conversation 
