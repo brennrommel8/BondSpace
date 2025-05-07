@@ -10,23 +10,88 @@ export const useAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Add cleanup effect for when user leaves the app
+  // Handle socket connection and online status
   useEffect(() => {
+    let socket: any = null;
+    let onlineStatusInterval: NodeJS.Timeout;
+
+    const setupSocket = () => {
+      if (user?._id) {
+        socket = getSocket();
+        
+        if (socket) {
+          // Set up socket connection and online status
+          const handleConnect = () => {
+            console.log('Socket connected, setting up online status');
+            // Join user's personal room
+            socket.emit('join', user._id);
+            // Set online status
+            socket.emit('userOnline', user._id);
+            // Get list of online users
+            socket.emit('requestOnlineUsers');
+          };
+
+          // Handle initial connection
+          if (socket.connected) {
+            handleConnect();
+          } else {
+            socket.once('connect', handleConnect);
+          }
+
+          // Set up periodic online status refresh
+          onlineStatusInterval = setInterval(() => {
+            if (socket.connected) {
+              socket.emit('userOnline', user._id);
+            }
+          }, 30000); // Refresh every 30 seconds
+
+          // Handle reconnection
+          socket.on('reconnect', () => {
+            console.log('Socket reconnected, restoring online status');
+            handleConnect();
+          });
+
+          // Handle disconnection
+          socket.on('disconnect', () => {
+            console.log('Socket disconnected, attempting to reconnect...');
+          });
+        }
+      }
+    };
+
+    // Initial setup
+    setupSocket();
+
+    // Handle page visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && socket?.connected) {
+        console.log('Page visible, refreshing online status');
+        socket.emit('userOnline', user?._id);
+        socket.emit('requestOnlineUsers');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Handle beforeunload
     const handleBeforeUnload = () => {
-      const socket = getSocket();
-      if (socket && user?._id) {
+      if (socket?.connected && user?._id) {
         socket.emit('userOffline', user._id);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Clean up
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Also handle offline status when component unmounts
-      const socket = getSocket();
-      if (socket && user?._id) {
+      if (onlineStatusInterval) {
+        clearInterval(onlineStatusInterval);
+      }
+      if (socket?.connected && user?._id) {
         socket.emit('userOffline', user._id);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [user?._id]);
 
@@ -87,26 +152,24 @@ export const useAuth = () => {
         setUser(response.user);
         setAuthChecked(true);
         
-        // Initialize socket connection and set online status immediately
-        console.log('Setting up socket connection and online status');
+        // Initialize socket connection
+        console.log('Setting up socket connection after login');
         const socket = initializeSocket();
         
         if (socket) {
-          // Get user ID from the response
-          const userId = response.user._id;
-          
-          // Set up socket connection and online status
-          socket.once('connect', () => {
-            // Join user's personal room
+          // Ensure immediate connection and online status
+          const userId = response.user?._id;
+          if (socket.connected && userId) {
             socket.emit('join', userId);
-            // Set online status
             socket.emit('userOnline', userId);
-            // Get list of online users
             socket.emit('requestOnlineUsers');
-          });
-          
-          // Connect the socket
-          socket.connect();
+          } else if (userId) {
+            socket.once('connect', () => {
+              socket.emit('join', userId);
+              socket.emit('userOnline', userId);
+              socket.emit('requestOnlineUsers');
+            });
+          }
         }
         
         toast.success('Logged in successfully');
