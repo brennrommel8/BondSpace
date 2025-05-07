@@ -110,15 +110,11 @@ export const initializeSocket = (): Socket | null => {
             // Join user's personal room
             socket.emit('join', userId);
             
-            // Explicitly request online users list
-            socket.emit('requestOnlineUsers');
+            // Notify server that this user is online
+            socket.emit('userOnline', userId);
             
-            // Also join any active conversation if the ID is in localStorage
-            const activeConversationId = localStorage.getItem('activeConversationId');
-            if (activeConversationId) {
-              console.log('Rejoining conversation room from localStorage:', activeConversationId);
-              socket.emit('joinConversation', activeConversationId);
-            }
+            // Request current list of online users
+            socket.emit('requestOnlineUsers');
           } catch (error) {
             console.error('Error decoding token:', error);
           }
