@@ -26,6 +26,8 @@ const VideoCall: React.FC<VideoCallProps> = ({
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isConnecting, setIsConnecting] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -36,10 +38,22 @@ const VideoCall: React.FC<VideoCallProps> = ({
   useEffect(() => {
     const initializeCall = async () => {
       try {
-        // Get local media stream
+        setIsConnecting(true);
+        setConnectionError(null);
+
+        // Get local media stream with mobile-friendly constraints
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user',
+            aspectRatio: 1.777777778
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
         
         setStream(mediaStream);
@@ -52,18 +66,23 @@ const VideoCall: React.FC<VideoCallProps> = ({
         const socket = getSocket();
         
         if (!socket) {
-          toast.error('Unable to connect to the server');
-          return;
+          throw new Error('Unable to connect to the server');
         }
         
         socketRef.current = socket;
         
-        // Create RTCPeerConnection with STUN/TURN servers
+        // Create RTCPeerConnection with additional STUN/TURN servers
         const peerConnection = new RTCPeerConnection({
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-          ]
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
+          ],
+          iceCandidatePoolSize: 10,
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require'
         });
         
         peerConnectionRef.current = peerConnection;
@@ -87,10 +106,21 @@ const VideoCall: React.FC<VideoCallProps> = ({
         
         // Handle connection state changes
         peerConnection.onconnectionstatechange = () => {
+          console.log('Connection state:', peerConnection.connectionState);
           if (peerConnection.connectionState === 'connected') {
+            setIsConnecting(false);
             console.log('WebRTC connection established');
           } else if (['disconnected', 'failed', 'closed'].includes(peerConnection.connectionState)) {
+            setConnectionError(`Connection ${peerConnection.connectionState}`);
             console.log('WebRTC connection state:', peerConnection.connectionState);
+          }
+        };
+
+        // Handle ICE connection state changes
+        peerConnection.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', peerConnection.iceConnectionState);
+          if (peerConnection.iceConnectionState === 'failed') {
+            setConnectionError('Connection failed. Please try again.');
           }
         };
         
@@ -101,6 +131,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
             remote.addTrack(track);
           });
           setRemoteStream(remote);
+          setIsConnecting(false);
           
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remote;
@@ -139,6 +170,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
             }
           } catch (error) {
             console.error('Error handling signal:', error);
+            setConnectionError('Error establishing connection');
           }
         });
         
@@ -153,6 +185,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
         }
       } catch (error) {
         console.error('Error setting up call:', error);
+        setConnectionError('Failed to access camera and microphone');
         toast.error('Failed to access camera and microphone');
       }
     };
@@ -170,7 +203,12 @@ const VideoCall: React.FC<VideoCallProps> = ({
     try {
       if (!peerConnectionRef.current || !socketRef.current) return;
       
-      const offer = await peerConnectionRef.current.createOffer();
+      const offer = await peerConnectionRef.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        iceRestart: true
+      });
+      
       await peerConnectionRef.current.setLocalDescription(offer);
       
       socketRef.current.emit('signalData', {
@@ -181,6 +219,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
       });
     } catch (error) {
       console.error('Error creating offer:', error);
+      setConnectionError('Error creating connection offer');
     }
   };
 
@@ -255,13 +294,20 @@ const VideoCall: React.FC<VideoCallProps> = ({
                 <Phone className="h-12 w-12 text-white" />
               </div>
               <h3 className="text-xl font-medium">Connecting to {remoteUserName}...</h3>
-              <p className="mt-2 text-gray-400">Please wait while we establish the connection</p>
+              <p className="mt-2 text-gray-400">
+                {isConnecting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                    Establishing connection...
+                  </span>
+                ) : connectionError || "Please wait while we establish the connection"}
+              </p>
             </div>
           </div>
         )}
         
         {/* Small self-view */}
-        <div className="absolute bottom-4 right-4 w-1/4 max-w-[200px] aspect-video rounded-lg overflow-hidden border-2 border-white shadow-lg">
+        <div className={`absolute bottom-4 right-4 w-1/4 max-w-[200px] aspect-video rounded-lg overflow-hidden border-2 border-white shadow-lg ${isConnecting ? 'opacity-50' : ''}`}>
           <video
             ref={localVideoRef}
             className="w-full h-full object-cover"
@@ -273,12 +319,13 @@ const VideoCall: React.FC<VideoCallProps> = ({
       </div>
       
       {/* Call controls */}
-      <div className="py-4 px-6 bg-gray-800 flex items-center justify-center space-x-4">
+      <div className="flex items-center justify-center gap-4 p-4 bg-black bg-opacity-50">
         <Button
           variant="outline"
           size="icon"
           className={`rounded-full h-12 w-12 ${isMuted ? 'bg-red-500 hover:bg-red-600 text-white border-none' : 'text-white border-white'}`}
           onClick={toggleAudio}
+          disabled={isConnecting}
         >
           {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </Button>
@@ -295,6 +342,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
           size="icon"
           className={`rounded-full h-12 w-12 ${!isVideoEnabled ? 'bg-red-500 hover:bg-red-600 text-white border-none' : 'text-white border-white'}`}
           onClick={toggleVideo}
+          disabled={isConnecting}
         >
           {isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
         </Button>
