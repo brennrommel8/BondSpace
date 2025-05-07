@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { format } from 'date-fns';
-import { Send, Paperclip, X, Play, Users, ChevronLeft, Trash2, Video, MessageSquare } from 'lucide-react';
+import { Send, Paperclip, X, Play, Users, ChevronLeft, Trash2, Video, MessageSquare, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -369,6 +369,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         console.log('Message deletion event received:', data);
         
         if (data.conversationId === activeConversation._id) {
+          console.log('Updating UI for deleted message:', data.messageId);
           // Mark the message as deleted in the current conversation
           setMessages(prev => prev.map(msg => {
             if (msg._id === data.messageId) {
@@ -513,19 +514,14 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   };
 
   const isOwnMessage = (message: Message) => {
+    // Get the sender ID from the message
     const senderId = typeof message.sender === 'string' ? message.sender : message.sender._id;
     
-    // Collect all possible current user IDs
-    const possibleUserIds = [
-      userId,              // ID passed as prop
-      user?._id,           // ID from user store (_id format)
-      user?.id,            // ID from user store (id format)
-    ].filter(Boolean);     // Remove any undefined/null values
+    // Get the current user's ID from props or store
+    const currentUserId = userId || user?._id || user?.id;
     
-    // Check if sender ID matches any of our possible IDs
-    const isOwn = possibleUserIds.some(id => id === senderId);
-    
-    return isOwn;
+    // Compare the IDs
+    return senderId === currentUserId;
   };
 
   const getOtherParticipant = (conversation: ConversationData) => {
@@ -784,7 +780,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       const response = await chatApi.deleteMessage(messageId);
       
       if (response.success) {
-        // Mark the message as deleted in the UI
+        // Mark the message as deleted in the UI immediately
         setMessages(prevMessages => prevMessages.map(msg => 
           msg._id === messageId 
             ? { ...msg, deleted: true, content: undefined, media: [] } 
@@ -793,6 +789,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         
         // Send socket notification about deleted message
         if (activeConversation) {
+          console.log('Sending deletion notification for message:', messageId);
           sendMessageDeletionNotification(activeConversation._id, messageId);
         }
         
@@ -1137,61 +1134,84 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                           </div>
                         )}
                         
-                        <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                          <div className="flex max-w-[80%] items-end">
-                            {!isOwn && (
-                              <Avatar className="h-8 w-8 mr-2">
-                                <AvatarImage 
-                                  src={getProfileImageUrl(message.sender.profilePicture)} 
-                                  alt={message.sender.name} 
-                                />
-                                <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                            )}
-                            
-                            <div 
-                              className={`relative group ${
-                                isOwn 
-                                  ? 'bg-emerald-600 text-white rounded-tl-lg rounded-tr-2xl rounded-bl-lg' 
-                                  : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-tl-2xl rounded-br-lg'
-                              } p-3 ${message.deleted ? 'italic opacity-60' : ''}`}
-                            >
-                              {message.deleted ? (
-                                <p className="text-sm">This message was deleted</p>
-                              ) : (
-                                <>
-                                  {message.content && <p className="text-sm">{message.content}</p>}
-                                  
-                                  {message.media && message.media.length > 0 && (
-                                    <div className="mt-2">
-                                      {renderMediaAttachments(message.media)}
-                                    </div>
-                                  )}
-                                  
-                                  <div className={`text-xs mt-1 ${isOwn ? 'text-emerald-100' : 'text-gray-500'}`}>
-                                    {formatTime(message.createdAt)}
-                                    {isOwn && message.read && (
-                                      <span className="ml-1">• Read</span>
-                                    )}
-                                  </div>
-                                </>
-                              )}
+                        <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} items-start gap-2`}>
+                          {!isOwn && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage 
+                                src={getProfileImageUrl(message.sender.profilePicture)} 
+                                alt={message.sender.name} 
+                              />
+                              <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          
+                          {/* Three dots menu for own messages */}
+                          {isOwn && !message.deleted && (
+                            <div className="relative">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Toggle dropdown menu
+                                  const menu = e.currentTarget.nextElementSibling;
+                                  if (menu) {
+                                    menu.classList.toggle('hidden');
+                                  }
+                                }}
+                              >
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
                               
-                              {/* Delete button for own messages that aren't already deleted */}
-                              {isOwn && !message.deleted && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 -mr-10 h-6 w-6 p-0 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              {/* Dropdown menu */}
+                              <div className="absolute right-0 top-full mt-1 hidden bg-white rounded-md shadow-lg border border-gray-200 py-1 z-10">
+                                <button
+                                  className="w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteMessage(message._id);
+                                    // Hide the menu after clicking
+                                    const menu = e.currentTarget.parentElement;
+                                    if (menu) {
+                                      menu.classList.add('hidden');
+                                    }
                                   }}
                                 >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </button>
+                              </div>
                             </div>
+                          )}
+                          
+                          <div 
+                            className={`relative ${
+                              isOwn 
+                                ? 'bg-emerald-600 text-white rounded-tl-lg rounded-tr-2xl rounded-bl-lg' 
+                                : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-tl-2xl rounded-br-lg'
+                            } p-3 ${message.deleted ? 'italic opacity-60' : ''}`}
+                          >
+                            {message.deleted ? (
+                              <p className="text-sm">This message was deleted</p>
+                            ) : (
+                              <>
+                                {message.content && <p className="text-sm">{message.content}</p>}
+                                
+                                {message.media && message.media.length > 0 && (
+                                  <div className="mt-2">
+                                    {renderMediaAttachments(message.media)}
+                                  </div>
+                                )}
+                                
+                                <div className={`text-xs mt-1 ${isOwn ? 'text-emerald-100' : 'text-gray-500'}`}>
+                                  {formatTime(message.createdAt)}
+                                  {isOwn && message.read && (
+                                    <span className="ml-1">• Read</span>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </React.Fragment>
