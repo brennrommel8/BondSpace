@@ -101,31 +101,14 @@ export const initializeSocket = (): Socket | null => {
           url: SOCKET_URL
         });
         
-        // Request a list of online users (with null check)
-        if (socket) {
-          // Get the user ID from the token
-          const token = getAuthToken();
-          if (token) {
-            try {
-              // Decode the JWT token to get the user ID
-              const payload = JSON.parse(atob(token.split('.')[1]));
-              const userId = payload.id || payload._id;
-              
-              // Notify server that this user is online with their ID
-              socket.emit('userOnline', userId);
-              
-              // Request current list of online users
-              socket.emit('requestOnlineUsers');
-            } catch (error) {
-              console.error('Error decoding token:', error);
-            }
-          }
-          
-          // Also join any active conversation if the ID is in localStorage
-          const activeConversationId = localStorage.getItem('activeConversationId');
-          if (activeConversationId) {
-            console.log('Rejoining conversation room from localStorage:', activeConversationId);
-            socket.emit('joinConversation', activeConversationId);
+        // Join user's personal room for direct messages
+        if (token && socket) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const userId = payload.id || payload._id;
+            socket.emit('join', userId);
+          } catch (error) {
+            console.error('Error decoding token:', error);
           }
         }
       });
@@ -184,18 +167,14 @@ export const initializeSocket = (): Socket | null => {
       socket.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason, new Date().toISOString());
         
-        // Notify server that this user is offline with their ID
-        if (socket) {
-          const token = getAuthToken();
-          if (token) {
-            try {
-              // Decode the JWT token to get the user ID
-              const payload = JSON.parse(atob(token.split('.')[1]));
-              const userId = payload.id || payload._id;
-              socket.emit('userOffline', userId);
-            } catch (error) {
-              console.error('Error decoding token:', error);
-            }
+        // Leave user's personal room
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const userId = payload.id || payload._id;
+            socket?.emit('leave', userId);
+          } catch (error) {
+            console.error('Error decoding token:', error);
           }
         }
         
@@ -209,22 +188,22 @@ export const initializeSocket = (): Socket | null => {
       // Listen for online users list when requested
       socket.on('onlineUsers', (users: string[]) => {
         console.log('Received online users list:', users);
-        // Emit an event to notify all clients about the updated online users list
-        socket?.emit('broadcastOnlineUsers', users);
+        // Update the online users state in the hook
+        socket?.emit('onlineUsersReceived', users);
       });
 
       // Listen for user online status changes
       socket.on('userOnline', (userId: string) => {
         console.log('User came online:', userId);
-        // Broadcast this to all connected clients
-        socket?.emit('broadcastUserOnline', userId);
+        // Update the online users state in the hook
+        socket?.emit('userOnlineReceived', userId);
       });
 
       // Listen for user offline status changes
       socket.on('userOffline', (userId: string) => {
         console.log('User went offline:', userId);
-        // Broadcast this to all connected clients
-        socket?.emit('broadcastUserOffline', userId);
+        // Update the online users state in the hook
+        socket?.emit('userOfflineReceived', userId);
       });
     } catch (err) {
       console.error('Error creating socket connection:', err);
