@@ -26,9 +26,7 @@ import useSocket from '@/hooks/useSocket';
 import TypingIndicator from './TypingIndicator';
 import VideoCall from './VideoCall';
 import IncomingCallNotification from './IncomingCallNotification';
-
-// Define default avatar path
-const DEFAULT_AVATAR = '/assets/default-profile.png';
+import { getProfileImageUrl, preloadProfilePictures } from '@/utils/profileImageUtils';
 
 // Local interface for structured message data after transformation
 interface Message {
@@ -93,29 +91,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     roomId: string;
   } | null>(null);
   const [initiatingCall, setInitiatingCall] = useState(false);
-
-  // Enhanced getProfileImageUrl with preloading
-  const getProfileImageUrl = (profilePicture: any): string => {
-    if (!profilePicture) {
-      return DEFAULT_AVATAR;
-    }
-    
-    let imageUrl: string;
-    
-    if (typeof profilePicture === 'string') {
-      imageUrl = profilePicture;
-    } else if (profilePicture.url) {
-      imageUrl = profilePicture.url;
-    } else {
-      return DEFAULT_AVATAR;
-    }
-
-    // Preload the image immediately
-    const img = new Image();
-    img.src = imageUrl;
-    
-    return imageUrl;
-  };
 
   // Preload profile pictures for all participants
   useEffect(() => {
@@ -231,15 +206,18 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   // Preload all images immediately
   const preloadAllImages = (conversations: ConversationData[], messages: Message[]) => {
-    // Create a Set to store unique image URLs
-    const imageUrls = new Set<string>();
+    // Create arrays for profile pictures and usernames
+    const conversationProfilePictures: unknown[] = [];
+    const conversationUsernames: string[] = [];
+    const messageProfilePictures: unknown[] = [];
+    const messageUsernames: string[] = [];
 
     // Add profile pictures from conversations
     conversations.forEach(conversation => {
       conversation.participants.forEach(participant => {
         if (participant.profilePicture) {
-          const url = getProfileImageUrl(participant.profilePicture);
-          imageUrls.add(url);
+          conversationProfilePictures.push(participant.profilePicture);
+          conversationUsernames.push(participant.username);
         }
       });
     });
@@ -247,27 +225,25 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     // Add profile pictures from messages
     messages.forEach(message => {
       if (message.sender.profilePicture) {
-        const url = getProfileImageUrl(message.sender.profilePicture);
-        imageUrls.add(url);
+        messageProfilePictures.push(message.sender.profilePicture);
+        messageUsernames.push(message.sender.username);
       }
       // Add message media images
       if (message.media) {
         message.media.forEach(media => {
           if (media.mediaType === 'image') {
-            imageUrls.add(media.url);
+            conversationProfilePictures.push(media.url);
           }
           if (media.thumbnail) {
-            imageUrls.add(media.thumbnail);
+            conversationProfilePictures.push(media.thumbnail);
           }
         });
       }
     });
 
-    // Preload all images simultaneously
-    imageUrls.forEach(url => {
-      const img = new Image();
-      img.src = url;
-    });
+    // Preload all profile pictures efficiently
+    preloadProfilePictures(conversationProfilePictures, conversationUsernames);
+    preloadProfilePictures(messageProfilePictures, messageUsernames);
   };
 
   // Preload images whenever conversations or messages change
@@ -496,12 +472,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         const transformedMsgs = response.messages.map(transformMessage);
         
         // Preload all profile pictures before setting messages
-        transformedMsgs.forEach(message => {
-          if (message.sender.profilePicture) {
-            const img = new Image();
-            img.src = getProfileImageUrl(message.sender.profilePicture);
-          }
-        });
+        const profilePictures = transformedMsgs.map(msg => msg.sender.profilePicture);
+        const usernames = transformedMsgs.map(msg => msg.sender.username);
+        preloadProfilePictures(profilePictures, usernames);
         
         console.log("Fetched Messages:", response.messages);
         console.log("Transformed Messages:", transformedMsgs);

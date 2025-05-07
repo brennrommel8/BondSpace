@@ -1,8 +1,7 @@
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
-
 import { cn } from "@/lib/utils"
-import { DEFAULT_AVATAR } from "@/utils/profileImageUtils"
+import { getProfileImageUrl } from "@/utils/profileImageUtils"
 
 function Avatar({
   className,
@@ -20,23 +19,28 @@ function Avatar({
   )
 }
 
+interface AvatarImageProps extends React.ComponentProps<typeof AvatarPrimitive.Image> {
+  username?: string;
+}
+
 function AvatarImage({
   className,
   src,
+  username,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: AvatarImageProps) {
   // Use state to track image loading errors
-  const [imgSrc, setImgSrc] = React.useState(src || DEFAULT_AVATAR)
+  const [imgSrc, setImgSrc] = React.useState<string>(() => getProfileImageUrl(src, username))
 
   // Update imgSrc when src prop changes
   React.useEffect(() => {
-    setImgSrc(src || DEFAULT_AVATAR)
-  }, [src])
+    setImgSrc(getProfileImageUrl(src, username))
+  }, [src, username])
 
   // Handle image loading errors
   const handleError = () => {
-    // If image fails to load, use default avatar
-    setImgSrc(DEFAULT_AVATAR)
+    // If image fails to load, use default avatar with username
+    setImgSrc(getProfileImageUrl(null, username))
   }
 
   return (
@@ -58,7 +62,7 @@ function AvatarFallback({
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
+        "flex h-full w-full items-center justify-center rounded-full bg-muted",
         className
       )}
       {...props}
