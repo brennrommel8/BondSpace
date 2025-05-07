@@ -95,6 +95,60 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   } | null>(null);
   const [initiatingCall, setInitiatingCall] = useState(false);
 
+  // Add image preloading function
+  const preloadImage = (url: string) => {
+    const img = new Image();
+    img.src = url;
+    return img;
+  };
+
+  // Cache for preloaded images
+  const imageCache = new Map<string, HTMLImageElement>();
+
+  // Enhanced getProfileImageUrl with preloading
+  const getProfileImageUrl = (profilePicture: any): string => {
+    if (!profilePicture) {
+      return DEFAULT_AVATAR;
+    }
+    
+    let imageUrl: string;
+    
+    if (typeof profilePicture === 'string') {
+      imageUrl = profilePicture;
+    } else if (profilePicture.url) {
+      imageUrl = profilePicture.url;
+    } else {
+      return DEFAULT_AVATAR;
+    }
+
+    // Preload the image if not in cache
+    if (!imageCache.has(imageUrl)) {
+      imageCache.set(imageUrl, preloadImage(imageUrl));
+    }
+    
+    return imageUrl;
+  };
+
+  // Preload profile pictures for all participants
+  useEffect(() => {
+    conversations.forEach(conversation => {
+      conversation.participants.forEach(participant => {
+        if (participant.profilePicture) {
+          getProfileImageUrl(participant.profilePicture);
+        }
+      });
+    });
+  }, [conversations]);
+
+  // Preload profile pictures for messages
+  useEffect(() => {
+    messages.forEach(message => {
+      if (message.sender.profilePicture) {
+        getProfileImageUrl(message.sender.profilePicture);
+      }
+    });
+  }, [messages]);
+
   // Transform API message to local format
   const transformMessage = (apiMsg: ApiMessage): Message => {
     // Handle case where sender could be a string ID or a full user object
@@ -146,23 +200,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       unreadCount: 0,
       updatedAt: apiConv.updatedAt
     };
-  };
-
-  // Helper function to get profile image URL
-  const getProfileImageUrl = (profilePicture: any): string => {
-    if (!profilePicture) {
-      return DEFAULT_AVATAR;
-    }
-    
-    if (typeof profilePicture === 'string') {
-      return profilePicture;
-    }
-    
-    if (profilePicture.url) {
-      return profilePicture.url;
-    }
-    
-    return DEFAULT_AVATAR;
   };
 
   // Debug helper to print simplified conversation 
@@ -336,6 +373,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         if (messageConversationId === activeConversation._id) {
           console.log('Message is for current conversation');
           
+          // Refresh messages for the current conversation
+          fetchMessages(activeConversation._id);
+          
           // Check if this is a complete message object we can use directly
           if (receivedMessageObj && typeof receivedMessageObj === 'object' && 
               (receivedMessageObj._id || receivedMessageObj.id)) {
@@ -372,7 +412,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         } else {
           // Message is for a different conversation
           console.log('Message is for different conversation:', messageConversationId);
-          // Just show a notification without refreshing conversations
+          // Refresh conversations to update the last message
+          fetchConversations();
           toast.info('New message in another conversation');
         }
       });
