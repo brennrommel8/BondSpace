@@ -774,21 +774,34 @@ export const PostCard = ({
           <div>
             <div className="font-medium">{post.user?.name || 'User'}</div>
             <div className="text-sm text-gray-500">
-              @{post.user?.username || 'user'} • {format(new Date(post.createdAt || new Date()), 'MMM d, yyyy')}
+              @{post.user?.username || 'user'} • {format(new Date(post.createdAt || new Date()), 'MMM d, yyyy h:mm a')}
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0 pb-2">
         <div className="whitespace-pre-wrap mb-2">{post.content || ''}</div>
-        {post.media && post.media.type === 'image' && post.media.url && (
+        {post.media && post.media.url && (
           <div className="mt-3 rounded-md overflow-hidden">
-            <img 
-              src={post.media.url} 
-              alt="Post media" 
-              className="w-full h-auto object-cover rounded-md max-h-[500px]"
-              loading="lazy"
-            />
+            {post.media.type === 'image' ? (
+              <img 
+                src={post.media.url} 
+                alt="Post media" 
+                className="w-full h-auto object-cover rounded-md max-h-[500px]"
+                loading="lazy"
+              />
+            ) : post.media.type === 'video' ? (
+              <video 
+                src={post.media.url}
+                className="w-full h-auto object-cover rounded-md max-h-[500px]"
+                controls
+                preload="metadata"
+                playsInline
+              >
+                <source src={post.media.url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            ) : null}
           </div>
         )}
       </CardContent>
@@ -880,7 +893,7 @@ export const PostCard = ({
                             <div className="text-sm">{comment.content}</div>
                           </div>
                           <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2">
-                            <span>{format(new Date(comment.createdAt), 'MMM d, yyyy')}</span>
+                            <span>{format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}</span>
                             <button 
                               className="text-emerald-600 hover:text-emerald-700 font-medium"
                               onClick={() => setReplyingTo(commentId)}
@@ -923,7 +936,7 @@ export const PostCard = ({
                                         <div className="text-sm">{reply.content}</div>
                                       </div>
                                       <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2">
-                                        <span>{format(new Date(reply.createdAt), 'MMM d, yyyy')}</span>
+                                        <span>{format(new Date(reply.createdAt), 'MMM d, yyyy h:mm a')}</span>
                                         
                                         {/* Display reply reactions badge */}
                                         {reply.reactions && reply.reactions.length > 0 && (

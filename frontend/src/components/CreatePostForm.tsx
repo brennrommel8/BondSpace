@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User } from '@/api/postApi';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { toast } from 'sonner';
 
 interface CreatePostFormProps {
   currentUser: User | null;
@@ -55,9 +56,15 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Only accept images
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+      // Check file size (500MB limit)
+      if (file.size > 500 * 1024 * 1024) {
+        toast.error('File size must be less than 500MB');
+        return;
+      }
+      
+      // Accept both images and videos
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        toast.error('Please select an image or video file');
         return;
       }
       
@@ -140,11 +147,23 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
               {/* Media preview */}
               {mediaPreview && (
                 <div className="relative mt-3 rounded-md overflow-hidden">
-                  <img 
-                    src={mediaPreview} 
-                    alt="Preview" 
-                    className="w-full h-auto object-cover rounded-md max-h-[300px]" 
-                  />
+                  {mediaFile?.type.startsWith('image/') ? (
+                    <img 
+                      src={mediaPreview} 
+                      alt="Preview" 
+                      className="w-full h-auto object-cover rounded-md max-h-[300px]" 
+                    />
+                  ) : mediaFile?.type.startsWith('video/') ? (
+                    <video 
+                      src={mediaPreview}
+                      className="w-full h-auto object-cover rounded-md max-h-[300px]"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src={mediaPreview} type={mediaFile.type} />
+                      Your browser does not support the video tag.
+                    </video>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleRemoveMedia}
@@ -176,7 +195,7 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={handleFileChange}
               className="hidden"
               id="media-upload"
@@ -189,7 +208,7 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
               disabled={isSubmitting}
             >
               <Image className="h-4 w-4 mr-2" />
-              Add Image
+              Add Media
             </Button>
             <Button
               type="button"

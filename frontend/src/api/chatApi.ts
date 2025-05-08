@@ -150,7 +150,7 @@ export const chatApi = {
    * Send a message in a conversation
    * @param conversationId ID of the conversation
    * @param content Message content (optional if files are provided)
-   * @param files Optional files to upload (images only, max 3)
+   * @param files Optional files to upload (images or videos, max 3)
    * @returns The created message
    */
   sendMessage: async (
@@ -186,12 +186,15 @@ export const chatApi = {
           };
         }
         
-        // Make sure all files are images
-        const allImages = files.every(file => file.type.startsWith('image/'));
-        if (!allImages) {
+        // Check if all files are either images or videos
+        const validFiles = files.every(file => 
+          file.type.startsWith('image/') || file.type.startsWith('video/')
+        );
+        
+        if (!validFiles) {
           return {
             success: false,
-            error: 'Only image files are allowed'
+            error: 'Only image and video files are allowed'
           };
         }
         

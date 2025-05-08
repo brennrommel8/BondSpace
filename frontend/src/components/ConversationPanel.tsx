@@ -383,24 +383,44 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   // File handling functions
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      // Convert FileList to array and limit to 3 files
-      const newFiles = Array.from(e.target.files).slice(0, 3);
-      
-      // Generate preview URLs for the files
-      const urls = newFiles.map(file => URL.createObjectURL(file));
-      
-      setSelectedFiles(prev => {
-        // Limit total to 3 files
-        const combined = [...prev, ...newFiles].slice(0, 3);
-        return combined;
-      });
-      
-      setPreviewUrls(prev => {
-        const combined = [...prev, ...urls].slice(0, 3);
-        return combined;
-      });
+    const files = Array.from(e.target.files || []);
+    
+    // Check if any file is too large (50MB limit)
+    const hasLargeFile = files.some(file => file.size > 50 * 1024 * 1024);
+    if (hasLargeFile) {
+      toast.error('Files must be smaller than 50MB');
+      return;
     }
+    
+    // Check if any file is not an image or video
+    const hasInvalidFile = files.some(file => 
+      !file.type.startsWith('image/') && !file.type.startsWith('video/')
+    );
+    if (hasInvalidFile) {
+      toast.error('Only image and video files are allowed');
+      return;
+    }
+    
+    // Create preview URLs for images only
+    const newPreviewUrls = files.map(file => {
+      if (file.type.startsWith('image/')) {
+        return URL.createObjectURL(file);
+      }
+      return null;
+    }).filter((url): url is string => url !== null);
+    
+    // Update state
+    setSelectedFiles(prev => {
+      // Limit total to 3 files
+      const combined = [...prev, ...files].slice(0, 3);
+      return combined;
+    });
+    
+    setPreviewUrls(prev => {
+      // Limit total to 3 previews
+      const combined = [...prev, ...newPreviewUrls].slice(0, 3);
+      return combined;
+    });
   };
   
   const removeFile = (index: number) => {
@@ -416,12 +436,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     fileInputRef.current?.click();
   };
 
-  // Cleanup preview URLs on unmount
+  // Cleanup preview URLs on unmount or when files change
   useEffect(() => {
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, []);
+  }, [previewUrls]);
 
   // Set default view based on screen size and handle resizing
   useEffect(() => {
@@ -696,7 +716,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     );
   };
 
-  // Update renderMediaAttachments to make images clickable
+  // Update renderMediaAttachments to handle videos better
   const renderMediaAttachments = (media: Media[]) => {
     return (
       <div className={`flex flex-wrap gap-2 mt-2 max-w-full`}>
@@ -710,24 +730,22 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                 onClick={() => setSelectedImage(item.url)}
               />
             ) : (
-              <div className="relative rounded-lg overflow-hidden">
+              <div className="relative rounded-lg overflow-hidden border border-gray-200">
                 <video 
                   src={item.url}
                   className="max-h-32 sm:max-h-48 max-w-full object-cover"
-                  controls={false}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full bg-white bg-opacity-50 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                </div>
+                  controls
+                  preload="metadata"
+                  playsInline
+                >
+                  <source src={item.url} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
                 {item.thumbnail && (
                   <img 
                     src={item.thumbnail} 
                     alt="Video thumbnail" 
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                   />
                 )}
               </div>
@@ -1255,13 +1273,29 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
               {/* Preview selected files */}
               {selectedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {previewUrls.map((url, index) => (
+                  {selectedFiles.map((file, index) => (
                     <div key={index} className="relative h-16 w-16 rounded overflow-hidden">
-                      <img 
-                        src={url} 
-                        alt={`Upload preview ${index + 1}`} 
-                        className="h-16 w-16 object-cover"
-                      />
+                      {file.type.startsWith('image/') ? (
+                        <img 
+                          src={previewUrls[index]} 
+                          alt={`Upload preview ${index + 1}`} 
+                          className="h-16 w-16 object-cover"
+                        />
+                      ) : file.type.startsWith('video/') ? (
+                        <div className="h-16 w-16 bg-gray-100 flex items-center justify-center">
+                          <video 
+                            src={URL.createObjectURL(file)}
+                            className="h-16 w-16 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-white bg-opacity-50 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                       <button 
                         className="absolute top-0 right-0 bg-black bg-opacity-50 rounded-full h-5 w-5 flex items-center justify-center text-white"
                         onClick={() => removeFile(index)}
