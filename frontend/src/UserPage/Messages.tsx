@@ -13,7 +13,6 @@ const Messages: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { user } = useUserStore();
   const { loading: authLoading, authChecked, checkAuthStatus } = useAuth();
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { operationsStatus, fetchOperationsStatus } = useFriendStore();
@@ -55,7 +54,7 @@ const Messages: React.FC = () => {
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        setError('Failed to verify authentication status');
+        toast.error('Failed to verify authentication status');
       }
     };
 
