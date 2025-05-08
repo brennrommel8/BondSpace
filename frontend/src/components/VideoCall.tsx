@@ -32,13 +32,21 @@ const VideoCall: React.FC<VideoCallProps> = ({
   const [call, setCall] = useState<Call | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize Stream client
   useEffect(() => {
     const initClient = async () => {
       try {
+        console.log('Initializing Stream client...');
+        console.log('User:', { id: remoteUserId, name: remoteUserName });
+        console.log('Room:', roomId);
+        console.log('Call type:', isIncoming ? 'Incoming' : 'Outgoing');
+        console.log('Call status:', isAnswered ? 'Answered' : 'Not answered');
+
         // Generate token for the user
         const token = await generateStreamToken(remoteUserId, remoteUserName);
+        console.log('Token generated successfully');
 
         const client = new StreamVideoClient({
           apiKey: '4jn8epjtj47y',
@@ -49,28 +57,56 @@ const VideoCall: React.FC<VideoCallProps> = ({
           },
         });
 
+        console.log('Stream client created');
         setClient(client);
 
         // Create a call
         const call = client.call('default', roomId);
-        await call.getOrCreate();
-        setCall(call);
+        console.log('Call object created');
 
-        // Join the call based on whether it's incoming or outgoing
-        if (isIncoming) {
-          // For incoming calls, wait for the other participant
-          await call.join({ create: false });
-        } else {
-          // For outgoing calls, create and join immediately
-          await call.join({ create: true });
+        try {
+          await call.getOrCreate();
+          console.log('Call created or retrieved');
+          setCall(call);
+
+          // Set up call event listeners
+          call.on('call.ended', () => {
+            console.log('Call ended');
+            onEndCall();
+          });
+
+          call.on('connection.error', (error) => {
+            console.error('Call error:', error);
+            setError('Call error occurred');
+            toast.error('Call error occurred');
+          });
+
+          // Handle errors during call setup
+          try {
+            await call.join({ create: !isIncoming });
+            console.log('Successfully joined call');
+          } catch (error) {
+            console.error('Error joining call:', error);
+            setError('Failed to join call');
+            toast.error('Failed to join call');
+            throw error;
+          }
+
+        } catch (callError) {
+          console.error('Error during call setup:', callError);
+          setError('Failed to set up call');
+          toast.error('Failed to set up call');
+          throw callError;
         }
 
         return () => {
+          console.log('Cleaning up call...');
           call.leave();
           client.disconnectUser();
         };
       } catch (error) {
         console.error('Error initializing Stream client:', error);
+        setError('Failed to initialize video call');
         toast.error('Failed to initialize video call');
         onEndCall();
       }
@@ -127,6 +163,26 @@ const VideoCall: React.FC<VideoCallProps> = ({
       </div>
     );
   };
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="bg-red-500 p-4 rounded-full mx-auto mb-4">
+            <PhoneOff className="h-12 w-12 text-white" />
+          </div>
+          <h3 className="text-xl font-medium mb-2">Call Failed</h3>
+          <p className="text-gray-400">{error}</p>
+          <Button
+            className="mt-4 bg-emerald-600 hover:bg-emerald-700"
+            onClick={onEndCall}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!client || !call) {
     return (
