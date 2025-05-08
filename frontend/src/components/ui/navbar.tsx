@@ -94,12 +94,6 @@ const Navbar = () => {
     handleClose()
   }
 
-  // Function to toggle mobile chat dropdown
-  const toggleMobileChat = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsChatOpen(!isChatOpen)
-  }
-
   // Handle logo click - refresh current page or go to home if on different page
   const handleLogoClick = () => {
     if (location.pathname === '/UserAccount') {
@@ -208,31 +202,6 @@ const Navbar = () => {
               )}
             </Button>
 
-            {/* Mobile Message Button - Visible only on small screens */}
-            <div className="relative md:hidden" ref={mobileChatRef}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full bg-emerald-50 hover:bg-emerald-100"
-                onClick={toggleMobileChat}
-              >
-                <MessageSquare className="h-5 w-5 text-emerald-600" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </Button>
-              
-              {/* Mobile Chat Dropdown */}
-              {isChatOpen && (
-                <ChatDropdown 
-                  isOpen={isChatOpen} 
-                  onClose={() => setIsChatOpen(false)} 
-                />
-              )}
-            </div>
-
             {/* Desktop Icons */}
             <div className="hidden md:flex items-center space-x-2">
               <Button
@@ -318,7 +287,14 @@ const Navbar = () => {
                 className="w-full justify-start px-4 py-2 text-base font-medium text-emerald-600 hover:bg-emerald-50"
                 onClick={() => handleNavigation('/messages')}
               >
-                <MessageSquare className="mr-3 h-5 w-5" />
+                <div className="relative mr-3">
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
                 Messages
               </Button>
             </div>
