@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@stream-io/video-react-sdk": "^1.15.0",
+    "stream-chat": "^9.0.1"
+  }
+}
