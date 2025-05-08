@@ -20,7 +20,6 @@ import {
   sendMessageDeletionNotification
 } from '@/utils/socketUtils';
 import useSocket from '@/hooks/useSocket';
-import TypingIndicator from './TypingIndicator';
 import { getProfileImageUrl, preloadProfilePictures } from '@/utils/profileImageUtils';
 
 // Local interface for structured message data after transformation
@@ -69,6 +68,16 @@ interface MessageDeletedData {
   messageId: string;
 }
 
+const TypingIndicator: React.FC = () => {
+  return (
+    <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-2 w-16">
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+    </div>
+  );
+};
+
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
   const { user } = useUserStore();
   const { isConnected, onlineUsers, forceReconnect, initializeSocketConnection } = useSocket();
@@ -79,12 +88,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   const [sendingMessage, setSendingMessage] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [typingUsers, setTypingUsers] = useState<{[key: string]: { userId: string, username: string, timer: any }}>({}); 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const [showConversationList, setShowConversationList] = useState(true);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   
   // Preload profile pictures for all participants
   useEffect(() => {
@@ -801,84 +810,46 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     });
   };
 
-  // Handle typing indicator events
-  useEffect(() => {
-    if (activeConversation && isConnected) {
-      const cleanup = onTypingIndicator((data) => {
-        if (data.conversationId === activeConversation._id && data.userId !== userId) {
-          // Find the user's name from conversation participants
-          const typingUser = activeConversation.participants.find(p => p._id === data.userId);
-          const username = typingUser ? typingUser.name : 'Someone';
-          
-          if (data.isTyping) {
-            // Clear any existing timeout for this user
-            if (typingUsers[data.userId] && typingUsers[data.userId].timer) {
-              clearTimeout(typingUsers[data.userId].timer);
-            }
-            
-            // Set a timeout to auto-remove typing indicator after 3 seconds of no updates
-            const timer = setTimeout(() => {
-              setTypingUsers(prev => {
-                const updated = { ...prev };
-                delete updated[data.userId];
-                return updated;
-              });
-            }, 3000);
-            
-            // Add or update the typing user
-            setTypingUsers(prev => ({
-              ...prev,
-              [data.userId]: { userId: data.userId, username, timer }
-            }));
-          } else {
-            // Remove the typing indicator for this user
-            setTypingUsers(prev => {
-              const updated = { ...prev };
-              if (updated[data.userId] && updated[data.userId].timer) {
-                clearTimeout(updated[data.userId].timer);
-              }
-              delete updated[data.userId];
-              return updated;
-            });
-          }
-        }
-      });
-      
-      return cleanup;
-    }
-  }, [activeConversation, isConnected, userId]);
-
-  // Handle input changes and send typing indicators
+  // Update handleInputChange
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMessageInput(value);
     
-    // Only send typing indicators if we have an active conversation and socket connection
+    // Send typing status
     if (activeConversation && isConnected) {
-      // If we're starting to type, send typing indicator immediately
-      if (value && !messageInput) {
-        sendTypingIndicator(activeConversation._id, true);
-      }
-      
-      // Clear any existing timeout
+      // Clear existing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
       
-      if (value) {
-        // Reset the timeout - user is still typing
-        typingTimeoutRef.current = setTimeout(() => {
-          // After 2 seconds of no typing, send stopped typing
-          if (activeConversation) {
-            sendTypingIndicator(activeConversation._id, false);
-          }
-        }, 2000);
-      } else {
-        // If input is now empty, send stopped typing right away
+      // Send typing status
+      sendTypingIndicator(activeConversation._id, true);
+      
+      // Set timeout to stop typing status
+      typingTimeoutRef.current = setTimeout(() => {
         sendTypingIndicator(activeConversation._id, false);
-      }
+      }, 2000);
     }
   };
+
+  // Update typing indicator listener
+  useEffect(() => {
+    if (!activeConversation || !isConnected) return;
+
+    const handleTypingIndicator = (data: { userId: string; isTyping: boolean }) => {
+      if (data.userId !== userId) {
+        setOtherUserTyping(data.isTyping);
+      }
+    };
+
+    onTypingIndicator(handleTypingIndicator);
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [activeConversation, isConnected, userId]);
 
   // Clean up typing indicator timeout on unmount or conversation change
   useEffect(() => {
@@ -886,38 +857,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      
-      // Also clear any timers in the typingUsers state
-      Object.values(typingUsers).forEach(user => {
-        if (user.timer) {
-          clearTimeout(user.timer);
-        }
-      });
     };
   }, [activeConversation]);
-
-  // Render user typing indicators
-  const renderTypingIndicators = () => {
-    const typingUsersArray = Object.values(typingUsers);
-    
-    if (typingUsersArray.length === 0) return null;
-    
-    if (typingUsersArray.length === 1) {
-      return (
-        <TypingIndicator 
-          isTyping={true} 
-          username={typingUsersArray[0].username} 
-        />
-      );
-    } else {
-      return (
-        <TypingIndicator 
-          isTyping={true} 
-          username={`${typingUsersArray.length} people`} 
-        />
-      );
-    }
-  };
 
   // Delete a message
   const handleDeleteMessage = async (messageId: string) => {
@@ -1222,7 +1163,23 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                     );
                   })}
                   
-                  {renderTypingIndicators()}
+                  {/* Add typing indicator */}
+                  {otherUserTyping && (
+                    <div className="flex items-start gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage 
+                          src={getProfileImageUrl(getOtherParticipant(activeConversation!).profilePicture)} 
+                          alt={getOtherParticipant(activeConversation!).name} 
+                        />
+                        <AvatarFallback>
+                          {getOtherParticipant(activeConversation!).name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="bg-gray-100 rounded-lg p-3">
+                        <TypingIndicator />
+                      </div>
+                    </div>
+                  )}
                   
                   <div ref={messagesEndRef} />
                 </div>
