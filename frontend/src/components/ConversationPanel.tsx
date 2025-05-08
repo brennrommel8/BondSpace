@@ -21,6 +21,7 @@ import {
 } from '@/utils/socketUtils';
 import useSocket from '@/hooks/useSocket';
 import { getProfileImageUrl, preloadProfilePictures } from '@/utils/profileImageUtils';
+import { useMessageStore } from '@/store/messageStore';
 
 // Local interface for structured message data after transformation
 interface Message {
@@ -94,6 +95,11 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   const navigate = useNavigate();
   const [showConversationList, setShowConversationList] = useState(true);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const { 
+    resetUnreadCount, 
+    removeUnreadConversation, 
+    updateConversationUnreadCount,
+  } = useMessageStore();
   
   // Preload profile pictures for all participants
   useEffect(() => {
@@ -179,8 +185,20 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         } else if (messageConversationId) {
           // Message is for a different conversation
           console.log('Message is for different conversation:', messageConversationId);
-          // Update that conversation's unread count or refresh the conversations list
+          // Update that conversation's unread count
+          const conversation = conversations.find(c => c._id === messageConversationId);
+          if (conversation) {
+            const newUnreadCount = (conversation.unreadCount || 0) + 1;
+            setConversations(prev => prev.map(c => 
+              c._id === messageConversationId 
+                ? { ...c, unreadCount: newUnreadCount }
+                : c
+            ));
+            updateConversationUnreadCount(messageConversationId, newUnreadCount);
+          }
+          // Show notification
           toast.info('New message in another conversation');
+          // Refresh conversations list
           fetchConversations();
         } else {
           console.log('Could not determine conversation for message:', data);
@@ -234,7 +252,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         }
       };
     }
-  }, [activeConversation, isConnected]);
+  }, [activeConversation, isConnected, conversations, updateConversationUnreadCount]);
 
   // Preload all images immediately
   const preloadAllImages = (conversations: ConversationData[], messages: Message[]) => {
@@ -639,6 +657,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       markConversationAsRead(conversation._id);
       // Clear any existing notifications for this conversation
       toast.dismiss();
+      // Reset the global unread count
+      resetUnreadCount();
+      // Remove from unread conversations
+      removeUnreadConversation(conversation._id);
+      // Update the conversation's unread count
+      updateConversationUnreadCount(conversation._id, 0);
     }
     
     // Hide conversation list on mobile when a conversation is selected
@@ -705,7 +729,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       const otherUser = getOtherParticipant(conversation);
       const isActive = activeConversation?._id === conversation._id;
       const isOnline = isUserOnline(otherUser._id);
-      const hasUnread = conversation.unreadCount > 0;
+      const isUnread = !isActive && conversation.unreadCount > 0;
+      const unreadCount = conversation.unreadCount || 0;
 
       // Format the last message preview
       const getLastMessagePreview = () => {
@@ -765,7 +790,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           key={conversation._id}
           className={`flex items-center p-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${
             isActive ? 'bg-emerald-50' : ''
-          } ${hasUnread ? 'bg-blue-50' : ''}`}
+          } ${isUnread ? 'bg-blue-50' : ''}`}
           onClick={() => selectConversation(conversation)}
         >
           <div className="relative">
@@ -777,9 +802,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
               />
               <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
             </Avatar>
-            {conversation.unreadCount > 0 && (
+            {isUnread && unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {conversation.unreadCount}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
             {isOnline && (
@@ -788,19 +813,19 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-center mb-1">
-              <p className={`font-medium truncate ${hasUnread ? 'text-blue-600' : 'text-gray-900'}`}>
+              <p className={`font-medium truncate ${isUnread ? 'text-blue-600' : 'text-gray-900'}`}>
                 {otherUser.name}
               </p>
-              <p className={`text-xs ${hasUnread ? 'text-blue-500' : 'text-gray-500'} ml-2 whitespace-nowrap`}>
+              <p className={`text-xs ${isUnread ? 'text-blue-500' : 'text-gray-500'} ml-2 whitespace-nowrap`}>
                 {getLastMessageTime()}
               </p>
             </div>
             <div className="flex items-center">
-              <p className={`text-sm truncate ${hasUnread ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              <p className={`text-sm truncate ${isUnread ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
                 <span className="text-gray-500">{getLastMessagePrefix()}</span>
                 {getLastMessagePreview()}
               </p>
-              {hasUnread && (
+              {isUnread && (
                 <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>
               )}
             </div>
@@ -938,18 +963,19 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     };
   }, [activeConversation?._id]);
 
-  // Add a function to mark conversation as read
+  // Update the markConversationAsRead function to handle unread counts
   const markConversationAsRead = async (conversationId: string) => {
     try {
-      const response = await chatApi.markConversationAsRead(conversationId);
-      if (response.success) {
-        // Update the conversation's unread count in the state
-        setConversations(prev => prev.map(conv => 
+      await chatApi.markConversationAsRead(conversationId);
+      setConversations(prev => 
+        prev.map(conv => 
           conv._id === conversationId 
             ? { ...conv, unreadCount: 0 }
             : conv
-        ));
-      }
+        )
+      );
+      resetUnreadCount();
+      removeUnreadConversation(conversationId);
     } catch (error) {
       console.error('Error marking conversation as read:', error);
     }
@@ -1068,6 +1094,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                     const showDate = index === 0 || 
                       new Date(message.createdAt).toDateString() !== 
                       new Date(messages[index - 1].createdAt).toDateString();
+                    const isUnread = !isOwn && !message.read;
                     
                     return (
                       <React.Fragment key={message._id}>
@@ -1134,7 +1161,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                             className={`relative ${
                               isOwn 
                                 ? 'bg-emerald-600 text-white rounded-tl-lg rounded-tr-2xl rounded-bl-lg' 
-                                : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-tl-2xl rounded-br-lg'
+                                : isUnread
+                                  ? 'bg-blue-100 text-blue-900 rounded-tr-lg rounded-tl-2xl rounded-br-lg'
+                                  : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-tl-2xl rounded-br-lg'
                             } p-3 ${message.deleted ? 'italic opacity-60' : ''}`}
                           >
                             {message.deleted ? (
@@ -1149,10 +1178,10 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                                   </div>
                                 )}
                                 
-                                <div className={`text-xs mt-1 ${isOwn ? 'text-emerald-100' : 'text-gray-500'}`}>
+                                <div className={`text-xs mt-1 ${isOwn ? 'text-emerald-100' : isUnread ? 'text-blue-600' : 'text-gray-500'}`}>
                                   {formatTime(message.createdAt)}
-                                  {isOwn && message.read && (
-                                    <span className="ml-1">• Read</span>
+                                  {isUnread && (
+                                    <span className="ml-1">• New</span>
                                   )}
                                 </div>
                               </>

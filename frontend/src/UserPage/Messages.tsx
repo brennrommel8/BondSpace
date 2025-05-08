@@ -8,6 +8,7 @@ import { chatApi, IUser } from '@/api/chatApi';
 import { Button } from '@/components/ui/button';
 import { Users, LogIn } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useMessageStore } from '@/store/messageStore';
 
 const Messages: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
@@ -16,6 +17,7 @@ const Messages: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { operationsStatus, fetchOperationsStatus } = useFriendStore();
+  const { resetUnreadCount } = useMessageStore();
   
   // Scroll to top on mount and fetch friends list only
   useEffect(() => {
@@ -23,7 +25,10 @@ const Messages: React.FC = () => {
     
     // Fetch friends list
     fetchOperationsStatus();
-  }, [fetchOperationsStatus]);
+    
+    // Reset unread count when entering messages page
+    resetUnreadCount();
+  }, [fetchOperationsStatus, resetUnreadCount]);
 
   // Log initial state
   useEffect(() => {

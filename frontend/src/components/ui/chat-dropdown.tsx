@@ -8,6 +8,7 @@ import { useFriendStore } from '@/store/friendStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { getProfileImageUrl } from '@/utils/profileImageUtils';
 import { toast } from 'sonner';
+import { useMessageStore } from '@/store/messageStore';
 
 interface ChatDropdownProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
   const [activeTab, setActiveTab] = useState<string>("conversations");
   const navigate = useNavigate();
   const { operationsStatus, fetchOperationsStatus } = useFriendStore();
+  const { unreadConversations, removeUnreadConversation } = useMessageStore();
   const isMobile = window.innerWidth < 768;
   const tabsRef = useRef<HTMLDivElement>(null);
   
@@ -74,6 +76,11 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
         
         // Navigate to the conversation page
         navigate(`/messages/${response.conversations[0]._id}`);
+        
+        // Remove from unread conversations if it was unread
+        if (unreadConversations.has(response.conversations[0]._id)) {
+          removeUnreadConversation(response.conversations[0]._id);
+        }
         
         // Only close dropdown in desktop view
         if (!isMobile) {
@@ -151,12 +158,18 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
             <TabsContent value="conversations" className="max-h-[calc(70vh-120px)] overflow-y-auto">
               {conversations.map(conversation => {
                 const otherUser = getOtherParticipant(conversation.participants);
+                const isUnread = unreadConversations.has(conversation._id);
                 return (
                   <div 
                     key={conversation._id} 
-                    className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
+                    className={`p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center ${
+                      isUnread ? 'bg-blue-50' : ''
+                    }`}
                     onClick={() => {
                       navigateWithoutClosing(`/messages/${conversation._id}`);
+                      if (isUnread) {
+                        removeUnreadConversation(conversation._id);
+                      }
                     }}
                   >
                     <Avatar className="h-10 w-10 mr-3">
@@ -164,11 +177,16 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
                       <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-gray-900 truncate">{otherUser.name}</p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className={`font-medium text-sm truncate ${isUnread ? 'text-blue-600' : 'text-gray-900'}`}>
+                        {otherUser.name}
+                      </p>
+                      <p className={`text-xs truncate ${isUnread ? 'text-blue-500' : 'text-gray-500'}`}>
                         {conversation.lastMessage ? conversation.lastMessage.content : 'No messages yet'}
                       </p>
                     </div>
+                    {isUnread && (
+                      <div className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></div>
+                    )}
                   </div>
                 );
               })}

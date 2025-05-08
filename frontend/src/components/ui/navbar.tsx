@@ -9,6 +9,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreatePostDialog } from "./create-post-dialog"
 import { ChatDropdown } from "./chat-dropdown"
 import { getProfileImageUrl } from "@/utils/profileImageUtils"
+import { useMessageStore } from "@/store/messageStore"
+import { useUserStore } from "@/store/userStore"
+import { onNewMessage } from "@/utils/socketUtils"
 
 const Navbar = () => {
   const navigate = useNavigate()
@@ -22,6 +25,29 @@ const Navbar = () => {
   const chatRef = useRef<HTMLDivElement>(null)
   const mobileChatRef = useRef<HTMLDivElement>(null)
   const { data: searchResults, isLoading } = useSearchUsers(searchQuery)
+  const { unreadCount, fetchUnreadCount, incrementUnreadCount, addUnreadConversation } = useMessageStore()
+  const { user } = useUserStore()
+
+  // Fetch initial unread count
+  useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
+
+  // Listen for new messages
+  useEffect(() => {
+    const cleanup = onNewMessage((data) => {
+      // Only increment if we're not in the messages page and the message is not from the current user
+      if (!location.pathname.startsWith('/messages') && data.senderId !== user?._id) {
+        incrementUnreadCount();
+        // Add conversation to unread set if it exists
+        if (data.conversationId) {
+          addUnreadConversation(data.conversationId);
+        }
+      }
+    });
+
+    return cleanup;
+  }, [location.pathname, incrementUnreadCount, user?._id, addUnreadConversation]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -191,6 +217,11 @@ const Navbar = () => {
                 onClick={toggleMobileChat}
               >
                 <MessageSquare className="h-5 w-5 text-emerald-600" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Button>
               
               {/* Mobile Chat Dropdown */}
@@ -234,6 +265,11 @@ const Navbar = () => {
                   }}
                 >
                   <MessageSquare className="h-5 w-5 text-emerald-600" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Button>
                 
                 {/* Chat Dropdown */}
