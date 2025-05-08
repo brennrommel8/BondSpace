@@ -100,6 +100,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     removeUnreadConversation, 
     updateConversationUnreadCount,
   } = useMessageStore();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   // Preload profile pictures for all participants
   useEffect(() => {
@@ -671,7 +672,31 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     }
   };
 
-  // Render media attachments for a message
+  // Add ImageModal component
+  const ImageModal: React.FC<{ imageUrl: string | null; onClose: () => void }> = ({ imageUrl, onClose }) => {
+    if (!imageUrl) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center">
+          <img 
+            src={imageUrl} 
+            alt="Full size" 
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button 
+            className="absolute top-4 right-4 bg-white rounded-full p-2 hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <X className="h-6 w-6 text-gray-600" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Update renderMediaAttachments to make images clickable
   const renderMediaAttachments = (media: Media[]) => {
     return (
       <div className={`flex flex-wrap gap-2 mt-2 max-w-full`}>
@@ -681,7 +706,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
               <img 
                 src={item.url} 
                 alt="Attachment" 
-                className="rounded-lg max-h-32 sm:max-h-48 max-w-full object-cover border border-gray-200"
+                className="rounded-lg max-h-32 sm:max-h-48 max-w-full object-cover border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setSelectedImage(item.url)}
               />
             ) : (
               <div className="relative rounded-lg overflow-hidden">
@@ -983,6 +1009,12 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] bg-gray-50 overflow-hidden">
+      {/* Add ImageModal */}
+      <ImageModal 
+        imageUrl={selectedImage} 
+        onClose={() => setSelectedImage(null)} 
+      />
+      
       {/* Conversation List Panel */}
       <div 
         className={`${
@@ -1044,7 +1076,10 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                   className="flex items-center cursor-pointer"
                   onClick={() => {
                     const otherUser = getOtherParticipant(activeConversation);
-                    navigate(`/profile/${otherUser._id}`);
+                    // Only navigate if there are no unread messages
+                    if (activeConversation.unreadCount === 0) {
+                      navigate(`/profile/${otherUser._id}`);
+                    }
                   }}
                 >
                   <Avatar className="h-9 w-9 mr-2">
