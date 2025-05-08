@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { format } from 'date-fns';
-import { Send, Paperclip, X, Play, Users, ChevronLeft, Trash2, Video, MessageSquare, MoreVertical } from 'lucide-react';
+import { Send, Paperclip, X, Users, ChevronLeft, Trash2, MessageSquare, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -17,17 +17,9 @@ import {
   onTypingIndicator,
   onMessageRead,
   onMessageDeleted,
-  sendMessageDeletionNotification,
-  onIncomingCall,
-  respondToCall,
-  callUser,
-  initializeSocket
+  sendMessageDeletionNotification
 } from '@/utils/socketUtils';
-import { videoCallApi } from '@/api/videoCallApi';
 import useSocket from '@/hooks/useSocket';
-import TypingIndicator from './TypingIndicator';
-import VideoCall from './VideoCall';
-import IncomingCallNotification from './IncomingCallNotification';
 import { getProfileImageUrl, preloadProfilePictures } from '@/utils/profileImageUtils';
 
 // Local interface for structured message data after transformation
@@ -76,9 +68,19 @@ interface MessageDeletedData {
   messageId: string;
 }
 
+const TypingIndicator: React.FC = () => {
+  return (
+    <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-2 w-16">
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+    </div>
+  );
+};
+
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
-  const { user } = useUserStore(); // Get current user from store
-  const { isConnected, onlineUsers, forceReconnect, initializeSocketConnection } = useSocket(); // Use our socket hook
+  const { user } = useUserStore();
+  const { isConnected, onlineUsers, forceReconnect, initializeSocketConnection } = useSocket();
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationData | null>(null);
@@ -86,24 +88,13 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   const [sendingMessage, setSendingMessage] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [typingUsers, setTypingUsers] = useState<{[key: string]: { userId: string, username: string, timer: any }}>({}); 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const [showConversationList, setShowConversationList] = useState(true);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   
-  // Video call states
-  const [isInCall, setIsInCall] = useState(false);
-  const [callRoomId, setCallRoomId] = useState<string | null>(null);
-  const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const [incomingCallData, setIncomingCallData] = useState<{
-    callerId: string;
-    callerName: string;
-    roomId: string;
-  } | null>(null);
-  const [initiatingCall, setInitiatingCall] = useState(false);
-
   // Preload profile pictures for all participants
   useEffect(() => {
     conversations.forEach(conversation => {
@@ -676,7 +667,11 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                   controls={false}
                 />
                 <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                  <Play className="h-8 w-8 text-white" />
+                  <div className="w-8 h-8 rounded-full bg-white bg-opacity-50 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
                 </div>
                 {item.thumbnail && (
                   <img 
@@ -815,84 +810,46 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     });
   };
 
-  // Handle typing indicator events
-  useEffect(() => {
-    if (activeConversation && isConnected) {
-      const cleanup = onTypingIndicator((data) => {
-        if (data.conversationId === activeConversation._id && data.userId !== userId) {
-          // Find the user's name from conversation participants
-          const typingUser = activeConversation.participants.find(p => p._id === data.userId);
-          const username = typingUser ? typingUser.name : 'Someone';
-          
-          if (data.isTyping) {
-            // Clear any existing timeout for this user
-            if (typingUsers[data.userId] && typingUsers[data.userId].timer) {
-              clearTimeout(typingUsers[data.userId].timer);
-            }
-            
-            // Set a timeout to auto-remove typing indicator after 3 seconds of no updates
-            const timer = setTimeout(() => {
-              setTypingUsers(prev => {
-                const updated = { ...prev };
-                delete updated[data.userId];
-                return updated;
-              });
-            }, 3000);
-            
-            // Add or update the typing user
-            setTypingUsers(prev => ({
-              ...prev,
-              [data.userId]: { userId: data.userId, username, timer }
-            }));
-          } else {
-            // Remove the typing indicator for this user
-            setTypingUsers(prev => {
-              const updated = { ...prev };
-              if (updated[data.userId] && updated[data.userId].timer) {
-                clearTimeout(updated[data.userId].timer);
-              }
-              delete updated[data.userId];
-              return updated;
-            });
-          }
-        }
-      });
-      
-      return cleanup;
-    }
-  }, [activeConversation, isConnected, userId]);
-
-  // Handle input changes and send typing indicators
+  // Update handleInputChange
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMessageInput(value);
     
-    // Only send typing indicators if we have an active conversation and socket connection
+    // Send typing status
     if (activeConversation && isConnected) {
-      // If we're starting to type, send typing indicator immediately
-      if (value && !messageInput) {
-        sendTypingIndicator(activeConversation._id, true);
-      }
-      
-      // Clear any existing timeout
+      // Clear existing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
       
-      if (value) {
-        // Reset the timeout - user is still typing
-        typingTimeoutRef.current = setTimeout(() => {
-          // After 2 seconds of no typing, send stopped typing
-          if (activeConversation) {
-            sendTypingIndicator(activeConversation._id, false);
-          }
-        }, 2000);
-      } else {
-        // If input is now empty, send stopped typing right away
+      // Send typing status
+      sendTypingIndicator(activeConversation._id, true);
+      
+      // Set timeout to stop typing status
+      typingTimeoutRef.current = setTimeout(() => {
         sendTypingIndicator(activeConversation._id, false);
-      }
+      }, 2000);
     }
   };
+
+  // Update typing indicator listener
+  useEffect(() => {
+    if (!activeConversation || !isConnected) return;
+
+    const handleTypingIndicator = (data: { userId: string; isTyping: boolean }) => {
+      if (data.userId !== userId) {
+        setOtherUserTyping(data.isTyping);
+      }
+    };
+
+    onTypingIndicator(handleTypingIndicator);
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [activeConversation, isConnected, userId]);
 
   // Clean up typing indicator timeout on unmount or conversation change
   useEffect(() => {
@@ -900,38 +857,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      
-      // Also clear any timers in the typingUsers state
-      Object.values(typingUsers).forEach(user => {
-        if (user.timer) {
-          clearTimeout(user.timer);
-        }
-      });
     };
   }, [activeConversation]);
-
-  // Render user typing indicators
-  const renderTypingIndicators = () => {
-    const typingUsersArray = Object.values(typingUsers);
-    
-    if (typingUsersArray.length === 0) return null;
-    
-    if (typingUsersArray.length === 1) {
-      return (
-        <TypingIndicator 
-          isTyping={true} 
-          username={typingUsersArray[0].username} 
-        />
-      );
-    } else {
-      return (
-        <TypingIndicator 
-          isTyping={true} 
-          username={`${typingUsersArray.length} people`} 
-        />
-      );
-    }
-  };
 
   // Delete a message
   const handleDeleteMessage = async (messageId: string) => {
@@ -1011,146 +938,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     };
   }, [activeConversation?._id]);
 
-  // Video call handlers
-  const initiateVideoCall = async () => {
-    if (!activeConversation) return;
-    
-    try {
-      setInitiatingCall(true);
-      const otherParticipant = getOtherParticipant(activeConversation);
-      
-      // Check if recipient is online
-      if (!isUserOnline(otherParticipant._id)) {
-        toast.error(`${otherParticipant.name} is offline`);
-        setInitiatingCall(false);
-        return;
-      }
-      
-      // Call the API to initiate the call
-      const response = await videoCallApi.initiateCall(otherParticipant._id);
-      
-      if (response.success && response.roomId) {
-        // Set the call room ID
-        setCallRoomId(response.roomId);
-        
-        // Notify the recipient through socket
-        callUser(otherParticipant._id, response.roomId);
-        
-        // Show the video call UI
-        setIsInCall(true);
-        
-        toast.success(`Calling ${otherParticipant.name}...`);
-      } else {
-        toast.error(response.message || 'Failed to initiate call');
-      }
-    } catch (error) {
-      console.error('Error initiating call:', error);
-      toast.error('Failed to initiate call');
-    } finally {
-      setInitiatingCall(false);
-    }
-  };
-  
-  const handleAcceptCall = async () => {
-    if (!incomingCallData) return;
-    
-    try {
-      // Accept the call through socket
-      respondToCall(incomingCallData.callerId, true, incomingCallData.roomId);
-      
-      // Set call states
-      setCallRoomId(incomingCallData.roomId);
-      setIsInCall(true);
-      setShowIncomingCall(false);
-      
-      toast.success(`Connected to ${incomingCallData.callerName}`);
-    } catch (error) {
-      console.error('Error accepting call:', error);
-      toast.error('Failed to accept call');
-    }
-  };
-  
-  const handleRejectCall = () => {
-    if (!incomingCallData) return;
-    
-    // Reject the call through socket
-    respondToCall(incomingCallData.callerId, false, incomingCallData.roomId);
-    
-    // Reset incoming call states
-    setShowIncomingCall(false);
-    setIncomingCallData(null);
-    
-    toast.info('Call rejected');
-  };
-  
-  const handleEndCall = () => {
-    // End the call
-    setIsInCall(false);
-    setCallRoomId(null);
-  };
-
-  // Listen for incoming calls
-  useEffect(() => {
-    if (!isConnected) return;
-    
-    const cleanup = onIncomingCall((data) => {
-      console.log('Incoming call:', data);
-      
-      // Find the caller's information
-      let callerName = data.fromUsername || 'Unknown User';
-      let callerId = data.from;
-      
-      // If we have the conversation with this user, use their name from there
-      const conversationWithCaller = conversations.find(conv => 
-        conv.participants.some(p => p._id === data.from)
-      );
-      
-      if (conversationWithCaller) {
-        const caller = conversationWithCaller.participants.find(p => p._id === data.from);
-        if (caller) {
-          callerName = caller.name;
-        }
-      }
-      
-      // Set the incoming call data
-      setIncomingCallData({
-        callerId,
-        callerName,
-        roomId: data.roomId
-      });
-      
-      // Show the incoming call notification
-      setShowIncomingCall(true);
-      
-      // Play a sound (optional)
-      // const audio = new Audio('/sounds/incoming-call.mp3');
-      // audio.play();
-    });
-    
-    return cleanup;
-  }, [isConnected, conversations]);
-
-  // Ensure socket connection is initialized
-  useEffect(() => {
-    if (!isConnected && user) {
-      console.log('Socket not connected - attempting to initialize');
-      const socketInstance = initializeSocket();
-      console.log('Socket initialization result:', !!socketInstance);
-    }
-  }, [isConnected, user]);
-
-  // Add this to the rendering of the conversations list (sidebar)
-  const renderSocketStatus = () => {
-    return (
-      <div className="flex items-center space-x-2 py-2 px-4 border-t">
-        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-        <span className="text-xs text-gray-500">
-          {isConnected ? 'Connected' : 'Connecting...'}
-        </span>
-      </div>
-    );
-  };
-
   // Add a function to mark conversation as read
   const markConversationAsRead = async (conversationId: string) => {
     try {
@@ -1178,8 +965,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       >
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-emerald-50">
           <h2 className="text-lg font-semibold text-emerald-800">Messages</h2>
-          {/* Socket status indicator */}
-          {renderSocketStatus()}
         </div>
 
         {/* Search and filter options could go here */}
@@ -1259,19 +1044,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Action buttons */}
-              <div className="flex items-center space-x-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-100 rounded-full"
-                  onClick={initiateVideoCall}
-                  disabled={initiatingCall}
-                >
-                  <Video className="h-5 w-5" />
-                </Button>
               </div>
             </div>
 
@@ -1391,7 +1163,23 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                     );
                   })}
                   
-                  {renderTypingIndicators()}
+                  {/* Add typing indicator */}
+                  {otherUserTyping && (
+                    <div className="flex items-start gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage 
+                          src={getProfileImageUrl(getOtherParticipant(activeConversation!).profilePicture)} 
+                          alt={getOtherParticipant(activeConversation!).name} 
+                        />
+                        <AvatarFallback>
+                          {getOtherParticipant(activeConversation!).name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="bg-gray-100 rounded-lg p-3">
+                        <TypingIndicator />
+                      </div>
+                    </div>
+                  )}
                   
                   <div ref={messagesEndRef} />
                 </div>
@@ -1489,27 +1277,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           </div>
         )}
       </div>
-
-      {/* Video Call Modal */}
-      {isInCall && callRoomId && (
-        <VideoCall 
-          roomId={callRoomId} 
-          remoteUserId={getOtherParticipant(activeConversation!)._id}
-          remoteUserName={getOtherParticipant(activeConversation!).name}
-          onEndCall={handleEndCall}
-          isAnswered={true}
-          isIncoming={!!incomingCallData}
-        />
-      )}
-      
-      {/* Incoming Call Notification */}
-      {showIncomingCall && incomingCallData && (
-        <IncomingCallNotification
-          callerName={incomingCallData.callerName}
-          onAccept={handleAcceptCall}
-          onReject={handleRejectCall}
-        />
-      )}
     </div>
   );
 };
