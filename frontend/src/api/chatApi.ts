@@ -255,51 +255,5 @@ export const chatApi = {
       }
       throw error;
     }
-  },
-
-  getStreamToken: async (userId: string, userName: string) => {
-    try {
-      console.log('Requesting Stream token with:', { userId, userName });
-      
-      // Get the current user's token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await api.post(`${API_ENDPOINTS.API}/stream/token`, {
-        userId,
-        userName
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      console.log('Stream token response:', response.data);
-      
-      if (!response.data.success) {
-        console.error('Stream token request failed:', response.data);
-        throw new Error(response.data.message || 'Failed to get Stream token');
-      }
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('Error getting Stream token:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-
-      // Handle specific error cases
-      if (error.response?.status === 401) {
-        throw new Error('Authentication required. Please log in again.');
-      } else if (error.response?.status === 500) {
-        throw new Error('Server error. Please try again later.');
-      }
-
-      throw error;
-    }
-  },
+  }
 };
