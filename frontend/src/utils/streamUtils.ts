@@ -1,11 +1,12 @@
 import { StreamChat } from 'stream-chat';
+import { chatApi } from '@/api/chatApi';
 
 const streamClient = StreamChat.getInstance('4jn8epjtj47y');
 
 export const generateStreamToken = async (userId: string, userName: string) => {
   try {
-    // Create a token for the user using the Stream secret
-    const token = streamClient.createToken(userId);
+    // Get token from server
+    const { token } = await chatApi.getStreamToken(userId, userName);
     
     // Connect the user to Stream
     await streamClient.connectUser(

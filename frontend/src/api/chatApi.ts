@@ -255,5 +255,18 @@ export const chatApi = {
       }
       throw error;
     }
-  }
+  },
+
+  getStreamToken: async (userId: string, userName: string) => {
+    try {
+      const response = await api.post(`${API_ENDPOINTS.API}/stream/token`, {
+        userId,
+        userName
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting Stream token:', error);
+      throw error;
+    }
+  },
 };
