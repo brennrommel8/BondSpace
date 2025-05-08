@@ -50,6 +50,7 @@ interface PaginationInfo {
 
 interface ConversationResponse {
   success: boolean;
+  conversation?: Conversation;
   conversations?: Conversation[];
   pagination?: PaginationInfo;
   message?: string;
@@ -64,12 +65,32 @@ export const chatApi = {
   createOrGetConversation: async (participantId: string): Promise<ConversationResponse> => {
     try {
       console.log('Creating/getting conversation with participant:', participantId);
+      
+      // Validate participant ID
+      if (!participantId) {
+        console.error('Invalid participant ID');
+        return {
+          success: false,
+          message: 'Invalid participant ID'
+        };
+      }
+
       // Using configured axios instance
       const response = await api.post<ConversationResponse>(
         `${API_ENDPOINTS.API}/chat/conversations`,
         { participantId }
       );
+      
       console.log('Create/get conversation response:', response.data);
+      
+      if (!response.data) {
+        console.error('No response data from server');
+        return {
+          success: false,
+          message: 'No response from server'
+        };
+      }
+
       return response.data;
     } catch (error: any) {
       console.error('Error creating or getting conversation:', error);

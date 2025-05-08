@@ -12,8 +12,9 @@ import { useAuth } from '@/hooks/useAuth';
 const Messages: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { user } = useUserStore();
-  const { loading: authLoading, authChecked } = useAuth();
+  const { loading: authLoading, authChecked, checkAuthStatus } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { operationsStatus, fetchOperationsStatus } = useFriendStore();
   
@@ -25,34 +26,96 @@ const Messages: React.FC = () => {
     fetchOperationsStatus();
   }, [fetchOperationsStatus]);
 
-  // Log debugging information without triggering re-renders
+  // Log initial state
   useEffect(() => {
-    console.log("Messages component rendered with:", {
+    console.log("Messages component initial state:", {
       user: user ? `ID: ${user._id}, Name: ${user.name}` : "Not logged in",
       conversationId: conversationId || "No conversation ID",
       authLoading,
-      authChecked
+      authChecked,
+      isAuthenticated: !!user
     });
-  }, [user, conversationId, authLoading, authChecked]);
+  }, []);
+
+  // Check auth state and redirect if needed
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        console.log("Checking auth status...");
+        await checkAuthStatus();
+        console.log("Auth check complete:", {
+          user: user ? `ID: ${user._id}, Name: ${user.name}` : "Not logged in",
+          authChecked,
+          authLoading
+        });
+
+        if (!user && authChecked && !authLoading) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/SignIn');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setError('Failed to verify authentication status');
+      }
+    };
+
+    checkAuth();
+  }, [checkAuthStatus, user, authChecked, authLoading, navigate]);
 
   // Create conversation with a friend
   const createConversation = async (friendId: string) => {
     try {
+      // Check if auth is still loading
+      if (authLoading || !authChecked) {
+        console.log('Auth check in progress, waiting...');
+        toast.error('Please wait while we verify your authentication');
+        return;
+      }
+
+      // Check if user is logged in
+      if (!user) {
+        console.log('User not logged in, redirecting to login');
+        toast.error('Please log in to start a conversation');
+        navigate('/SignIn');
+        return;
+      }
+
+      setLoading(true);
+      console.log('Creating conversation with friend:', friendId, {
+        currentUser: user ? `ID: ${user._id}, Name: ${user.name}` : "Not logged in",
+        authState: { authLoading, authChecked }
+      });
+      
+      // Call API to create conversation
       const response = await chatApi.createOrGetConversation(friendId);
-      if (response.success && response.conversations?.[0]) {
-        navigate(`/messages/${response.conversations[0]._id}`);
-        toast.success(`Started conversation with ${response.conversations[0].participants.find((p: IUser) => p._id !== user?._id)?.name}`);
+      console.log('Create conversation response:', response);
+
+      if (response.success && response.conversation) {
+        console.log('Conversation created successfully:', response.conversation);
+        // Navigate to the conversation
+        navigate(`/messages/${response.conversation._id}`);
+        
+        // Show success message with the other participant's name
+        const otherParticipant = response.conversation.participants.find(
+          (p: IUser) => p._id !== user._id
+        );
+        if (otherParticipant) {
+          toast.success(`Started conversation with ${otherParticipant.name}`);
+        }
       } else {
+        console.error('Failed to create conversation:', response);
         toast.error(response.message || 'Failed to create conversation');
       }
     } catch (error) {
       console.error('Error creating conversation:', error);
       toast.error('Could not start conversation');
+    } finally {
+      setLoading(false);
     }
   };
 
   // If loading authentication status
-  if (authLoading) {
+  if (authLoading || !authChecked) {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
         <div className="text-center p-8">
@@ -63,9 +126,8 @@ const Messages: React.FC = () => {
     );
   }
 
-  // If there's an issue with the user not being authenticated
+  // If user is not authenticated
   if (!user) {
-    console.warn("User not logged in, rendering login prompt");
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
         <div className="text-center p-8 max-w-md">
@@ -91,23 +153,6 @@ const Messages: React.FC = () => {
               Create Account
             </Button>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Display error if there is one
-  if (error) {
-    return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
-        <div className="text-center p-8">
-          <p className="text-red-500">{error}</p>
-          <button 
-            className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
-            onClick={() => setError(null)}
-          >
-            Try Again
-          </button>
         </div>
       </div>
     );
@@ -143,9 +188,22 @@ const Messages: React.FC = () => {
                   <p className="text-sm text-gray-500">@{friend.username}</p>
                 </div>
               </div>
-              <Button className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Users className="mr-2 h-4 w-4" />
-                Start Chat
+              <Button 
+                className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => createConversation(friend._id)}
+                disabled={loading}
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Starting Chat...
+                  </div>
+                ) : (
+                  <>
+                    <Users className="mr-2 h-4 w-4" />
+                    Start Chat
+                  </>
+                )}
               </Button>
             </div>
           ))}
