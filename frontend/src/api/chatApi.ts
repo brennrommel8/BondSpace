@@ -263,6 +263,11 @@ export const chatApi = {
         userId,
         userName
       });
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to get Stream token');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Error getting Stream token:', error);

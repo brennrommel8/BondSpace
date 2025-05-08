@@ -8,6 +8,10 @@ export const generateStreamToken = async (userId: string, userName: string) => {
     // Get token from server
     const { token } = await chatApi.getStreamToken(userId, userName);
     
+    if (!token) {
+      throw new Error('No token received from server');
+    }
+
     // Connect the user to Stream
     await streamClient.connectUser(
       {
