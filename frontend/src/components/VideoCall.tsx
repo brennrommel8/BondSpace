@@ -16,6 +16,8 @@ interface VideoCallProps {
   remoteUserId: string;
   remoteUserName: string;
   onEndCall: () => void;
+  isIncoming?: boolean;
+  isAnswered?: boolean;
 }
 
 const VideoCall: React.FC<VideoCallProps> = ({
@@ -23,6 +25,8 @@ const VideoCall: React.FC<VideoCallProps> = ({
   remoteUserId,
   remoteUserName,
   onEndCall,
+  isIncoming = false,
+  isAnswered = false,
 }) => {
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [call, setCall] = useState<Call | null>(null);
@@ -52,8 +56,14 @@ const VideoCall: React.FC<VideoCallProps> = ({
         await call.getOrCreate();
         setCall(call);
 
-        // Join the call
-        await call.join({ create: true });
+        // Join the call based on whether it's incoming or outgoing
+        if (isIncoming) {
+          // For incoming calls, wait for the other participant
+          await call.join({ create: false });
+        } else {
+          // For outgoing calls, create and join immediately
+          await call.join({ create: true });
+        }
 
         return () => {
           call.leave();
@@ -66,8 +76,12 @@ const VideoCall: React.FC<VideoCallProps> = ({
       }
     };
 
-    initClient();
-  }, [roomId, remoteUserId, remoteUserName]);
+    // Only initialize if the call is answered (for incoming calls)
+    // or immediately for outgoing calls
+    if (!isIncoming || (isIncoming && isAnswered)) {
+      initClient();
+    }
+  }, [roomId, remoteUserId, remoteUserName, isIncoming, isAnswered]);
 
   // Call controls component
   const CallControlsComponent = () => {
@@ -121,7 +135,11 @@ const VideoCall: React.FC<VideoCallProps> = ({
           <div className="animate-pulse h-24 w-24 bg-emerald-500 rounded-full mx-auto mb-4 flex items-center justify-center">
             <Phone className="h-12 w-12 text-white" />
           </div>
-          <h3 className="text-xl font-medium">Initializing call...</h3>
+          <h3 className="text-xl font-medium">
+            {isIncoming && !isAnswered 
+              ? 'Incoming call...' 
+              : 'Initializing call...'}
+          </h3>
         </div>
       </div>
     );
