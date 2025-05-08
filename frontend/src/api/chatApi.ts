@@ -261,9 +261,19 @@ export const chatApi = {
     try {
       console.log('Requesting Stream token with:', { userId, userName });
       
+      // Get the current user's token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await api.post(`${API_ENDPOINTS.API}/stream/token`, {
         userId,
         userName
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       console.log('Stream token response:', response.data);
@@ -281,6 +291,14 @@ export const chatApi = {
         status: error.response?.status,
         headers: error.response?.headers
       });
+
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required. Please log in again.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Server error. Please try again later.');
+      }
+
       throw error;
     }
   },
