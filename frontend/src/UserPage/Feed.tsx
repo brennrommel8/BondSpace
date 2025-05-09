@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePostQueries } from '@/hooks/usePostQueries';
 import { PostCard } from '@/components/PostCard';
 import { CreatePostForm } from '@/components/CreatePostForm';
-import { User } from '@/api/postApi';
+import { User, ReactionType } from '@/api/postApi';
 import { authApi } from '@/api/authApi';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -22,6 +22,8 @@ const Feed = () => {
     addComment,
     isAddingComment,
     replyToComment,
+    addReaction,
+    isAddingReaction,
     refetchPosts
   } = usePostQueries();
 
@@ -107,6 +109,13 @@ const Feed = () => {
     
     // Make the API call with user data already in the cache
     replyToComment({ postId, commentId, content });
+  };
+
+  const handleReaction = (postId: string, reactionType: ReactionType) => {
+    if (!currentUser) {
+      return;
+    }
+    addReaction({ postId, reactionType });
   };
 
   if (loading || isLoadingPosts) {
@@ -205,8 +214,10 @@ const Feed = () => {
                 onLike={handleLike}
                 onComment={handleComment}
                 onReply={handleReply}
+                onReaction={handleReaction}
                 isLiking={isTogglingLike}
                 isCommenting={isAddingComment}
+                isReacting={isAddingReaction}
               />
             );
           })}
