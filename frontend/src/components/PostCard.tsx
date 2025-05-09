@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { MessageCircle, Send, ThumbsUp } from 'lucide-react';
-import { Post, User, ReactionType, Reaction, postApi } from '@/api/postApi';
+import { Post, User, ReactionType, postApi } from '@/api/postApi';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { ReactionDisplay } from '@/components/ui/reaction-display';
 import { ReactionUsersDialog } from './ui/reaction-users-dialog';
 import { ReplyReactionButton } from './ui/reply-reaction-button';
 import { ReplyReactionBadge } from './ui/reply-reaction-badge';
+import { useReactions } from '@/hooks/useReactions';
 
 interface PostCardProps {
   post: Post;
@@ -19,12 +20,8 @@ interface PostCardProps {
   onLike: (postId: string) => void;
   onComment: (postId: string, content: string) => void;
   onReply: (postId: string, commentId: string, content: string) => void;
-  onReaction?: (postId: string, type: ReactionType) => void;
-  onReplyReaction?: (postId: string, commentId: string, replyId: string, type: ReactionType) => void;
   isLiking?: boolean;
   isCommenting?: boolean;
-  isReacting?: boolean;
-  isReplyReacting?: boolean;
 }
 
 // Emoji map for reaction types
@@ -43,12 +40,8 @@ export const PostCard = ({
   onLike,
   onComment,
   onReply,
-  onReaction,
-  onReplyReaction,
   isLiking,
-  isCommenting,
-  isReacting,
-  isReplyReacting
+  isCommenting
 }: PostCardProps) => {
   const [comment, setComment] = useState('');
   const [replyContent, setReplyContent] = useState('');
@@ -57,6 +50,13 @@ export const PostCard = ({
   const [showReactionPopover, setShowReactionPopover] = useState(false);
   const [showReactionDialog, setShowReactionDialog] = useState(false);
   
+  // Use React Query hooks for reactions
+  const { 
+    reactions: postReactions,
+    addReaction: addPostReaction,
+    isAddingReaction: isAddingPostReaction 
+  } = useReactions(post._id || post.id || '');
+
   // Store locally known users for display
   const [commentUsers, setCommentUsers] = useState<Record<string, User>>({});
 
@@ -583,29 +583,18 @@ export const PostCard = ({
   };
 
   const handleReaction = (type: ReactionType) => {
-    if (onReaction) {
-      const postId = (post._id || post.id || '').toString();
-      console.log(`Selected reaction: ${type} for post ${postId}`);
-      
-      // Track whether this is a new reaction or changing an existing one
-      const isChangingExisting = Boolean(userReaction);
-      console.log(`${isChangingExisting ? 'Changing' : 'Adding'} reaction: ${type}`);
-      
-      // Close the reaction popover before sending the request
-      setShowReactionPopover(false);
-      
-      // Let the parent component handle the API call
-      // The parent will update post.reactions which will cause this component to re-render
-      onReaction(postId, type);
-    }
-  };
-
-  // Handle reactions to replies
-  const handleReplyReaction = (postId: string, commentId: string, replyId: string, type: ReactionType) => {
-    if (onReplyReaction) {
-      console.log(`Adding ${type} reaction to reply ${replyId} in comment ${commentId}`);
-      onReplyReaction(postId, commentId, replyId, type);
-    }
+    const postId = (post._id || post.id || '').toString();
+    console.log(`Selected reaction: ${type} for post ${postId}`);
+    
+    // Track whether this is a new reaction or changing an existing one
+    const isChangingExisting = Boolean(userReaction);
+    console.log(`${isChangingExisting ? 'Changing' : 'Adding'} reaction: ${type}`);
+    
+    // Close the reaction popover before sending the request
+    setShowReactionPopover(false);
+    
+    // Use React Query mutation
+    addPostReaction(type);
   };
 
   // Helper function to get profile picture URL
@@ -721,7 +710,7 @@ export const PostCard = ({
   );
   
   // Find user's current reaction if any
-  const userReaction = currentUser && (post.reactions?.find(
+  const userReaction = currentUser && (postReactions?.find(
     reaction => reaction.user._id === currentUser._id || reaction.user.id === currentUser.id
   ) || (isLikedByUser ? { type: 'like' as ReactionType, user: currentUser } : null));
   
@@ -737,23 +726,6 @@ export const PostCard = ({
     
     // Capitalize reaction type
     return userReaction.type.charAt(0).toUpperCase() + userReaction.type.slice(1);
-  };
-  
-  // Get button style based on reaction type
-  const getReactionButtonVariant = () => {
-    if (!userReaction) return "ghost";
-    
-    // Style map for reaction types
-    const reactionStyles: Record<ReactionType, string> = {
-      like: "bg-blue-500 hover:bg-blue-600 text-white",
-      love: "bg-red-500 hover:bg-red-600 text-white", 
-      haha: "bg-yellow-500 hover:bg-yellow-600 text-white",
-      wow: "bg-yellow-400 hover:bg-yellow-500 text-white",
-      sad: "bg-purple-500 hover:bg-purple-600 text-white",
-      angry: "bg-orange-500 hover:bg-orange-600 text-white"
-    };
-    
-    return reactionStyles[userReaction.type] || "default";
   };
 
   return (
@@ -807,14 +779,12 @@ export const PostCard = ({
       </CardContent>
       <CardFooter className="flex flex-col items-start border-t pt-3">
         {/* Display reactions if any */}
-        {post.reactions && post.reactions.length > 0 && (
-          <div className="flex justify-start mb-2 w-full">
-            <div
-              className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-full transition-colors"
-              onClick={() => setShowReactionDialog(true)}
-            >
-            <ReactionDisplay reactions={post.reactions} />
-            </div>
+        {postReactions && postReactions.length > 0 && (
+          <div 
+            className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-full transition-colors"
+            onClick={() => setShowReactionDialog(true)}
+          >
+            <ReactionDisplay reactions={postReactions} />
           </div>
         )}
         
@@ -823,34 +793,31 @@ export const PostCard = ({
             <div className="relative">
               <Button
                 size="sm"
-                variant={userReaction ? "default" : "ghost"}
-                className={userReaction ? getReactionButtonVariant() : ""}
+                variant="ghost"
+                className="px-2 py-1 h-auto min-h-0"
                 onMouseEnter={() => setShowReactionPopover(true)}
                 onClick={handleLike}
-                disabled={isLiking || isReacting}
+                disabled={isLiking || isAddingPostReaction}
               >
                 {getReactionIcon()}
-                <span>{getReactionText()}</span>
-                {/* Count has been removed since it's disabled anyway */}
+                <span className="text-xs">{getReactionText()}</span>
               </Button>
               
-              {onReaction && (
-                <ReactionPopover 
-                  isOpen={showReactionPopover}
-                  onClose={() => setShowReactionPopover(false)}
-                  onReaction={handleReaction}
-                />
-              )}
+              <ReactionPopover 
+                isOpen={showReactionPopover}
+                onClose={() => setShowReactionPopover(false)}
+                onReaction={handleReaction}
+              />
             </div>
             
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setShowComments(!showComments)}
-              className="text-emerald-600 hover:bg-emerald-50"
+              className="text-emerald-600 hover:bg-emerald-50 px-2 py-1 h-auto min-h-0"
             >
               <MessageCircle className="mr-1 h-4 w-4" />
-              {post.comments?.length || 0}
+              <span className="text-xs">{post.comments?.length || 0}</span>
             </Button>
           </div>
         </div>
@@ -940,77 +907,26 @@ export const PostCard = ({
                                         
                                         {/* Display reply reactions badge */}
                                         {reply.reactions && reply.reactions.length > 0 && (
-                                          (() => {
-                                            console.log(`Reply reactions for reply ${reply._id || reply.id}:`, {
-                                              reactions: reply.reactions,
-                                              types: reply.reactions.map(r => r.type),
-                                              users: reply.reactions.map(r => r.user?._id || r.user?.id || 'unknown')
-                                            });
-                                            
-                                            // Ensure all reactions have a valid type
-                                            const validatedReactions = reply.reactions?.map(reaction => {
-                                              if (!reaction.type) {
-                                                console.warn('Found reaction with undefined type, defaulting to "like"', reaction);
-                                                return { ...reaction, type: 'like' as ReactionType };
-                                              }
-                                              return reaction;
-                                            });
-                                            
-                                            return (
-                                              <ReplyReactionBadge 
-                                                postId={post._id || post.id || ''}
-                                                commentId={comment._id || comment.id || ''}
-                                                replyId={reply._id || reply.id || ''}
-                                                reactions={validatedReactions} 
-                                                showCount={true}
-                                              />
-                                            );
-                                          })()
+                                          <ReplyReactionBadge 
+                                            postId={post._id || post.id || ''}
+                                            commentId={comment._id || comment.id || ''}
+                                            replyId={reply._id || reply.id || ''}
+                                            reactions={reply.reactions} 
+                                            showCount={true}
+                                          />
                                         )}
                                         
                                         {/* Reply Reaction Button */}
-                                        {onReplyReaction && (
-                                          (() => {
-                                            // Debug info - remove in production
-                                            console.log('Reply reactions:', {
-                                              replyId: reply._id || reply.id,
-                                              hasReactions: !!reply.reactions,
-                                              reactionCount: reply.reactions?.length || 0,
-                                              reactions: reply.reactions || []
-                                            });
-                                            
-                                            // Find the current user's reaction
-                                            let userReaction = null;
-                                            if (currentUser && reply.reactions && reply.reactions.length > 0) {
-                                              const foundReaction = reply.reactions.find(
-                                                (reaction: Reaction) => 
-                                                  reaction.user._id === currentUser._id || 
-                                                  reaction.user.id === currentUser._id
-                                              );
-                                              
-                                              if (foundReaction) {
-                                                userReaction = {
-                                                  type: foundReaction.type as ReactionType,
-                                                  user: foundReaction.user
-                                                };
-                                                console.log('Found user reaction:', userReaction);
-                                              }
-                                            }
-                                            
-                                            return (
-                                              <ReplyReactionButton
-                                                postId={post._id || post.id || ''}
-                                                commentId={comment._id || comment.id || ''}
-                                                replyId={reply._id || reply.id || ''}
-                                                currentUser={currentUser}
-                                                onReaction={handleReplyReaction}
-                                                userReaction={userReaction}
-                                                isReacting={isReplyReacting}
-                                                reactionCount={reply.reactions?.length || 0}
-                                              />
-                                            );
-                                          })()
-                                        )}
+                                        <ReplyReactionButton
+                                          postId={post._id || post.id || ''}
+                                          commentId={comment._id || comment.id || ''}
+                                          replyId={reply._id || reply.id || ''}
+                                          userReaction={reply.reactions?.find(r => 
+                                            r.user._id === currentUser?._id || 
+                                            r.user.id === currentUser?._id
+                                          )}
+                                          reactionCount={reply.reactions?.length || 0}
+                                        />
                                       </div>
                                     </div>
                                   </div>

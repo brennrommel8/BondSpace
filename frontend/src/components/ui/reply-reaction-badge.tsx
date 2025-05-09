@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { Reaction, ReactionType } from "@/api/postApi";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ReplyReactionUsersDialog } from "./reply-reaction-users-dialog";
+import { useReplyReactions } from "@/hooks/useReplyReactions";
 
 // Reaction icons with emojis
 const reactionIcons: Record<ReactionType, string> = {
@@ -28,7 +29,7 @@ interface ReplyReactionBadgeProps {
   postId: string;
   commentId: string;
   replyId: string;
-  reactions?: Reaction[]; // Reactions data to display
+  reactions?: Reaction[]; // Initial reactions data
   showCount?: boolean;
 }
 
@@ -36,15 +37,21 @@ export function ReplyReactionBadge({
   postId, 
   commentId, 
   replyId, 
-  reactions,
+  reactions: initialReactions,
   showCount = true
 }: ReplyReactionBadgeProps): React.JSX.Element | null {
   const [showDialog, setShowDialog] = useState(false);
   
+  // Use React Query hook for real-time reaction updates
+  const { reactions, totalCount } = useReplyReactions(postId, commentId, replyId);
+  
+  // Use hook data if available, otherwise fall back to initial reactions
+  const currentReactions = reactions.length > 0 ? reactions : (initialReactions || []);
+  
   // Process reaction data using memoization
   const reactionData = useMemo(() => {
     // If no reactions, return placeholder data
-    if (!reactions || reactions.length === 0) {
+    if (!currentReactions || currentReactions.length === 0) {
       return {
         hasReactions: false,
         reactionCounts: {},
@@ -54,7 +61,7 @@ export function ReplyReactionBadge({
     }
 
     // Count reactions by type
-    const reactionCounts = reactions.reduce<Record<string, number>>((counts, reaction) => {
+    const reactionCounts = currentReactions.reduce<Record<string, number>>((counts, reaction) => {
       counts[reaction.type] = (counts[reaction.type] || 0) + 1;
       return counts;
     }, {});
@@ -66,7 +73,7 @@ export function ReplyReactionBadge({
       .map(([type]) => type);
 
     // Get total reaction count
-    const totalReactions = reactions.length;
+    const totalReactions = totalCount || currentReactions.length;
 
     return {
       hasReactions: true,
@@ -74,7 +81,7 @@ export function ReplyReactionBadge({
       topReactions,
       totalReactions
     };
-  }, [reactions]);
+  }, [currentReactions, totalCount]);
 
   // If no reactions after all hooks are executed, return null
   if (!reactionData.hasReactions) {

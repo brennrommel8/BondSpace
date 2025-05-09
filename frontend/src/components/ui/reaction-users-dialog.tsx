@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReactionType } from '@/api/postApi';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,21 +31,8 @@ const ReactionColors: Record<ReactionType, string> = {
 };
 
 export function ReactionUsersDialog({ postId, isOpen, onClose }: ReactionUsersDialogProps) {
-  const { isLoading, error, reactions, reactionsByType, totalCount, fetchReactions } = useReactions();
+  const { isLoading, error, reactions, reactionsByType, totalCount } = useReactions(postId);
   const [activeReactionType, setActiveReactionType] = useState<ReactionType | "all">("all");
-  const lastFetchedPostId = useRef<string | null>(null);
-  const fetchingRef = useRef(false);
-
-  useEffect(() => {
-    if (isOpen && postId && !fetchingRef.current && lastFetchedPostId.current !== postId) {
-      fetchingRef.current = true;
-      lastFetchedPostId.current = postId;
-      
-      fetchReactions(postId).finally(() => {
-        fetchingRef.current = false;
-      });
-    }
-  }, [isOpen, postId, fetchReactions]);
   
   // Reset state when dialog closes
   useEffect(() => {
@@ -59,18 +46,14 @@ export function ReactionUsersDialog({ postId, isOpen, onClose }: ReactionUsersDi
     type => reactionsByType[type as ReactionType]?.length > 0
   ) as ReactionType[];
 
-  // Get all reactions in a single array
-  const allReactions = reactions.length > 0 ? reactions : Object.values(reactionsByType).flat();
-
   // Get the reactions to display based on active tab
   const displayedReactions = activeReactionType === "all" 
-    ? allReactions 
+    ? reactions 
     : reactionsByType[activeReactionType] || [];
 
   // Helper to get profile image URL
   const getProfileImageUrl = (profilePicture: any, username: string) => {
     if (!profilePicture) {
-      // Default avatar if no profile picture
       return `https://api.dicebear.com/7.x/initials/svg?seed=${username || 'user'}`;
     }
     
@@ -87,9 +70,11 @@ export function ReactionUsersDialog({ postId, isOpen, onClose }: ReactionUsersDi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Post Reactions ({totalCount})</DialogTitle>
+          <DialogTitle className="text-base font-semibold">
+            {activeReactionType === "all" ? "Reactions" : `${activeReactionType} (${reactionsByType[activeReactionType]?.length || 0})`}
+          </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
@@ -100,28 +85,36 @@ export function ReactionUsersDialog({ postId, isOpen, onClose }: ReactionUsersDi
           <div className="py-6 text-center">No reactions yet</div>
         ) : (
           <div>
-            {/* Simple tab selector */}
-            <div className="flex mb-4 border-b">
+            {/* Reaction type tabs */}
+            <div className="flex mb-4 border-b overflow-x-auto">
               <button 
                 onClick={() => setActiveReactionType("all")}
-                className={`px-3 py-2 text-sm ${activeReactionType === "all" ? "border-b-2 border-primary font-semibold" : "text-gray-500"}`}
+                className={`px-3 py-2 text-sm ${
+                  activeReactionType === "all" 
+                    ? "border-b-2 border-primary font-semibold" 
+                    : "text-gray-500"
+                }`}
               >
                 All ({totalCount})
               </button>
               
-              {availableReactionTypes.slice(0, 3).map(type => (
+              {availableReactionTypes.map(type => (
                 <button
                   key={type}
                   onClick={() => setActiveReactionType(type)}
-                  className={`px-3 py-2 text-sm flex items-center ${activeReactionType === type ? "border-b-2 border-primary font-semibold" : "text-gray-500"}`}
+                  className={`px-3 py-2 text-sm flex items-center ${
+                    activeReactionType === type 
+                      ? "border-b-2 border-primary font-semibold" 
+                      : "text-gray-500"
+                  }`}
                 >
                   <span className="mr-1 text-lg">{ReactionEmojis[type]}</span>
-                  <span className="ml-1">{type} ({reactionsByType[type]?.length || 0})</span>
+                  <span className="ml-1 capitalize">{type} ({reactionsByType[type]?.length || 0})</span>
                 </button>
               ))}
             </div>
 
-            {/* Scrollable content area */}
+            {/* Users list */}
             <div className="h-[300px] pr-4 overflow-y-auto">
               <div className="space-y-3">
                 {displayedReactions.map((reaction, index) => (

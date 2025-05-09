@@ -3,15 +3,13 @@ import { Button } from '@/components/ui/button';
 import { ThumbsUp } from 'lucide-react';
 import { ReactionPopover } from '@/components/ui/reaction-popover';
 import { ReactionType, User } from '@/api/postApi';
+import { useReplyReactions } from '@/hooks/useReplyReactions';
 
 interface ReactionButtonProps {
   postId: string;
   commentId: string;
   replyId: string;
-  currentUser: User | null;
-  onReaction: (postId: string, commentId: string, replyId: string, type: ReactionType) => void;
   userReaction?: { type: ReactionType; user: User } | null;
-  isReacting?: boolean;
   reactionCount?: number;
 }
 
@@ -25,32 +23,39 @@ const reactionIcons: Record<ReactionType, string> = {
   angry: "😡"
 };
 
-// Style map for reaction types
-const reactionStyles: Record<ReactionType, string> = {
-  like: "bg-emerald-500 hover:bg-emerald-600 text-white",
-  love: "bg-red-500 hover:bg-red-600 text-white", 
-  haha: "bg-yellow-500 hover:bg-yellow-600 text-white",
-  wow: "bg-yellow-400 hover:bg-yellow-500 text-white",
-  sad: "bg-purple-500 hover:bg-purple-600 text-white",
-  angry: "bg-orange-500 hover:bg-orange-600 text-white"
-};
-
 export const ReplyReactionButton: React.FC<ReactionButtonProps> = ({
   postId,
   commentId,
   replyId,
-  onReaction,
-  userReaction,
-  isReacting,
-  reactionCount = 0
+  userReaction: initialUserReaction,
+  reactionCount: initialReactionCount = 0
 }) => {
   const [showReactionPopover, setShowReactionPopover] = useState(false);
+  
+  // Use React Query hook for reply reactions
+  const { 
+    addReaction, 
+    isAddingReaction,
+    reactions,
+    totalCount
+  } = useReplyReactions(postId, commentId, replyId);
+  
+  // Get current user from localStorage
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  
+  // Get current user's reaction from the hook data
+  const userReaction = reactions.find(r => 
+    r.user._id === currentUser._id || 
+    r.user.id === currentUser._id
+  ) || initialUserReaction;
+  
+  // Use total count from hook or fallback to initial count
+  const reactionCount = totalCount || initialReactionCount;
   
   // Handle direct like on button click
   const handleLike = () => {
     const defaultReaction: ReactionType = 'like';
-    // Call the parent handler
-    onReaction(postId, commentId, replyId, defaultReaction);
+    addReaction(defaultReaction);
   };
 
   // Handle specific reaction selection
@@ -60,8 +65,8 @@ export const ReplyReactionButton: React.FC<ReactionButtonProps> = ({
     // Close the reaction popover before sending the request
     setShowReactionPopover(false);
     
-    // Call the parent handler
-    onReaction(postId, commentId, replyId, type);
+    // Use React Query mutation
+    addReaction(type);
   };
 
   // Get reaction icon to display
@@ -83,12 +88,6 @@ export const ReplyReactionButton: React.FC<ReactionButtonProps> = ({
     return userReaction.type.charAt(0).toUpperCase() + userReaction.type.slice(1);
   };
 
-  // Get button style
-  const getButtonVariant = () => {
-    if (!userReaction) return "ghost";
-    return reactionStyles[userReaction.type] || "default";
-  };
-
   // Build additional display text for reaction count
   const getReactionCountText = () => {
     if (reactionCount > 0) {
@@ -98,19 +97,17 @@ export const ReplyReactionButton: React.FC<ReactionButtonProps> = ({
   };
 
   return (
-    <div className="relative">
+    <div className="relative inline-flex">
       <Button
         size="sm"
-        variant={userReaction ? "default" : "ghost"}
-        className={`py-1 h-7 text-xs ${userReaction ? getButtonVariant() : "text-emerald-600 hover:bg-emerald-50"}`}
+        variant="ghost"
+        className="px-2 py-1 h-auto min-h-0"
         onMouseEnter={() => setShowReactionPopover(true)}
         onClick={handleLike}
-        disabled={isReacting}
+        disabled={isAddingReaction}
       >
         {getReactionIcon()}
-        <span className={`text-xs font-medium ${userReaction ? "text-white" : ""}`}>
-          {getReactionText()}{getReactionCountText()}
-        </span>
+        <span className="text-xs">{getReactionText()}{getReactionCountText()}</span>
       </Button>
       
       <ReactionPopover 

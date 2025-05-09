@@ -4,7 +4,17 @@ import { Toaster } from "sonner"
 import { useAuth } from './hooks/useAuth'
 import { useEffect } from 'react'
 
-const queryClient = new QueryClient()
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+      gcTime: 1000 * 60 * 5, // 5 minutes (replaces cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { checkAuthStatus, authChecked } = useAuth();
@@ -21,7 +31,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors />
+      <Toaster />
       <AuthProvider>
         <AppRoute />
       </AuthProvider>

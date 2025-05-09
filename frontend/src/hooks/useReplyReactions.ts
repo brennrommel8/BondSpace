@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postApi, Reaction, ReactionType } from '@/api/postApi';
 
 export interface UseReplyReactionsReturn {
@@ -7,100 +7,107 @@ export interface UseReplyReactionsReturn {
   reactions: Reaction[];
   reactionsByType: Record<ReactionType, Reaction[]>;
   totalCount: number;
-  fetchReplyReactions: (postId: string, commentId: string, replyId: string) => Promise<void>;
+  addReaction: (type: ReactionType) => Promise<void>;
+  isAddingReaction: boolean;
 }
 
 /**
- * Custom hook to fetch and manage reactions for a reply
+ * Custom hook to fetch and manage reactions for a reply using React Query
  */
-export const useReplyReactions = (): UseReplyReactionsReturn => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reactions, setReactions] = useState<Reaction[]>([]);
-  const [reactionsByType, setReactionsByType] = useState<Record<ReactionType, Reaction[]>>({} as Record<ReactionType, Reaction[]>);
-  const [totalCount, setTotalCount] = useState(0);
+export const useReplyReactions = (
+  postId: string,
+  commentId: string,
+  replyId: string
+): UseReplyReactionsReturn => {
+  const queryClient = useQueryClient();
 
-  /**
-   * Fetch reactions for a specific reply
-   */
-  const fetchReplyReactions = useCallback(async (postId: string, commentId: string, replyId: string): Promise<void> => {
-    if (!postId || !commentId || !replyId) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      console.log(`Fetching reactions for reply: ${replyId} in comment: ${commentId} of post: ${postId}`);
-      const response = await postApi.getReplyReactions(postId, commentId, replyId);
-      
-      if (response.success && response.data) {
-        console.log('Raw API response for reply reactions:', response.data);
-        
-        // Validate and fix reaction data before setting state
-        if (response.data.reactions && Array.isArray(response.data.reactions)) {
-          // Ensure all reactions have a valid type
-          const validatedReactions = response.data.reactions.map(reaction => {
-            if (!reaction.type) {
-              console.warn('Found reaction with undefined type in API response, defaulting to "like"', reaction);
-              return { ...reaction, type: 'like' as ReactionType };
+  // Query for fetching reactions
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reply-reactions', postId, commentId, replyId],
+    queryFn: () => postApi.getReplyReactions(postId, commentId, replyId),
+    enabled: !!(postId && commentId && replyId),
+  });
+
+  // Mutation for adding reactions with optimistic updates
+  const { mutate: addReaction, isPending: isAddingReaction } = useMutation({
+    mutationFn: (type: ReactionType) => postApi.addReplyReaction(postId, commentId, replyId, type),
+    onMutate: async (newReactionType) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ 
+        queryKey: ['reply-reactions', postId, commentId, replyId] 
+      });
+
+      // Snapshot the previous value
+      const previousReactions = queryClient.getQueryData([
+        'reply-reactions', 
+        postId, 
+        commentId, 
+        replyId
+      ]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(
+        ['reply-reactions', postId, commentId, replyId],
+        (old: any) => {
+          const currentReactions = old?.data?.reactions || [];
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          
+          // Remove any existing reaction from the current user
+          const filteredReactions = currentReactions.filter(
+            (r: Reaction) => r.user._id !== currentUser._id && r.user.id !== currentUser._id
+          );
+
+          // Add the new reaction
+          return {
+            ...old,
+            data: {
+              ...old?.data,
+              reactions: [
+                ...filteredReactions,
+                {
+                  type: newReactionType,
+                  user: currentUser,
+                  createdAt: new Date().toISOString()
+                }
+              ]
             }
-            
-            // Handle inconsistent reaction types (such as 'heart' vs 'love')
-            if (reaction.type.toLowerCase() === 'heart') {
-              console.log('Normalizing "heart" reaction to "love"');
-              return { ...reaction, type: 'love' as ReactionType };
-            }
-            
-            // Ensure the type is lowercase to match our enum
-            return { ...reaction, type: reaction.type.toLowerCase() as ReactionType };
-          });
-          
-          // Update the response data with validated reactions
-          response.data.reactions = validatedReactions;
-          
-          // Rebuild the byType grouping with validated reactions
-          const validatedByType: Record<ReactionType, Reaction[]> = {} as Record<ReactionType, Reaction[]>;
-          validatedReactions.forEach(reaction => {
-            const type = reaction.type || 'like';
-            if (!validatedByType[type]) {
-              validatedByType[type] = [];
-            }
-            validatedByType[type].push(reaction);
-          });
-          
-          // Update the response data with validated byType
-          response.data.byType = validatedByType;
-          
-          console.log('Normalized reaction types:', validatedReactions.map(r => r.type));
-          console.log('Normalized byType keys:', Object.keys(validatedByType));
+          };
         }
-        
-        // Store reaction data
-        setReactionsByType(response.data.byType as Record<ReactionType, Reaction[]>);
-        setReactions(response.data.reactions);
-        setTotalCount(response.data.totalCount);
-        
-        // Debug reaction types
-        const reactionTypes = response.data.reactions.map(r => r.type);
-        console.log('Reaction types in response:', reactionTypes);
-        console.log('Reaction by type in response:', Object.keys(response.data.byType));
-      } else {
-        setError("Failed to fetch reply reactions");
+      );
+
+      return { previousReactions };
+    },
+    onError: (_err, _newReactionType, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousReactions) {
+        queryClient.setQueryData(
+          ['reply-reactions', postId, commentId, replyId],
+          context.previousReactions
+        );
       }
-    } catch (err) {
-      console.error("Error fetching reply reactions:", err);
-      setError(err instanceof Error ? err.message : "Error loading reply reactions");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure we're in sync with the server
+      queryClient.invalidateQueries({ 
+        queryKey: ['reply-reactions', postId, commentId, replyId] 
+      });
+    },
+  });
 
   return {
     isLoading,
-    error,
-    reactions,
-    reactionsByType,
-    totalCount,
-    fetchReplyReactions
+    error: error ? (error as Error).message : null,
+    reactions: data?.data?.reactions || [],
+    reactionsByType: data?.data?.byType || {} as Record<ReactionType, Reaction[]>,
+    totalCount: data?.data?.totalCount || 0,
+    addReaction: async (type: ReactionType) => {
+      return new Promise((resolve, reject) => {
+        addReaction(type, {
+          onSuccess: () => resolve(),
+          onError: (error) => reject(error)
+        });
+      });
+    },
+    isAddingReaction
   };
 }; 
