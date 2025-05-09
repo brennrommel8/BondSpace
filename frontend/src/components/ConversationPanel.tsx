@@ -102,6 +102,10 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   } = useMessageStore();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
+  // Add a ref to track if we're manually scrolling
+  const isManualScrolling = useRef(false);
+  const lastMessageCount = useRef(0);
+
   // Preload profile pictures for all participants
   useEffect(() => {
     conversations.forEach(conversation => {
@@ -508,10 +512,44 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     }
   }, [conversationId, conversations]);
 
-  // Scroll to bottom of message list when messages change
+  // Update scroll behavior
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const messagesContainer = messagesEndRef.current?.parentElement;
+    if (!messagesContainer) return;
+
+    // Only auto-scroll if:
+    // 1. New messages were added (message count increased)
+    // 2. User is not manually scrolling
+    // 3. User is already near the bottom
+    const isAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop <= messagesContainer.clientHeight + 100;
+    const hasNewMessages = messages.length > lastMessageCount.current;
+
+    if (hasNewMessages && !isManualScrolling.current && isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    lastMessageCount.current = messages.length;
   }, [messages]);
+
+  // Add scroll event listener to detect manual scrolling
+  useEffect(() => {
+    const messagesContainer = messagesEndRef.current?.parentElement;
+    if (!messagesContainer) return;
+
+    const handleScroll = () => {
+      const isAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop <= messagesContainer.clientHeight + 100;
+      isManualScrolling.current = !isAtBottom;
+    };
+
+    messagesContainer.addEventListener('scroll', handleScroll);
+    return () => messagesContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Update scrollToBottom function
+  const scrollToBottom = () => {
+    isManualScrolling.current = false;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchConversations = async () => {
     try {
@@ -617,7 +655,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         });
         
         // Scroll to bottom
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollToBottom();
       } else {
         toast.error(response.error || 'Failed to send message');
       }
