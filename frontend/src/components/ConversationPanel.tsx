@@ -1353,7 +1353,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                 </Button>
               </form>
             </div>
-          </>
+          </> 
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-6">
