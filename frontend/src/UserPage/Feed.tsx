@@ -304,11 +304,9 @@ const Feed = () => {
                 onComment={handleComment}
                 onReply={handleReply}
                 onReaction={handleReaction}
-                onReplyReaction={handleReplyReaction}
                 isLiking={isTogglingLike}
                 isCommenting={isAddingComment}
                 isReacting={isAddingReaction}
-                isReplyReacting={isReplyingToReaction}
               />
             );
           })}
