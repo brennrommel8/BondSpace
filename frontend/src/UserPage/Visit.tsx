@@ -24,6 +24,7 @@ import {
 
 interface ExtendedPost {
   id: string;
+  _id?: string;
   content: string;
   createdAt: string;
   user: {
@@ -38,6 +39,7 @@ interface ExtendedPost {
   }>;
   comments: Array<{
     id: string;
+    _id?: string;
     content: string;
     createdAt: string;
     user: {
@@ -47,6 +49,7 @@ interface ExtendedPost {
     };
     replies: Array<{
       id: string;
+      _id?: string;
       content: string;
       createdAt: string;
       user: {
@@ -98,12 +101,14 @@ const Visit = () => {
   const [loading, setLoading] = useState(true)
   const [messagingLoading, setMessagingLoading] = useState(false)
   const [comment, setComment] = useState('')
+  const [replyContent, setReplyContent] = useState('')
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [showComments, setShowComments] = useState<Record<string, boolean>>({})
   const [showReactionPopover, setShowReactionPopover] = useState<Record<string, boolean>>({})
   const [showReactionDialog, setShowReactionDialog] = useState<Record<string, boolean>>({})
   const [isLiking, setIsLiking] = useState(false)
   const [isCommenting, setIsCommenting] = useState(false)
-  const [isReacting, setIsReacting] = useState(false)
+  const [isReplying, setIsReplying] = useState(false)
   const [showProfileImage, setShowProfileImage] = useState(false)
   
   // Get friend store state and actions
@@ -279,9 +284,46 @@ const Visit = () => {
     }
   }
 
+  const handleReply = async (postId: string, commentId: string, content: string) => {
+    try {
+      if (!postId || !commentId || !content.trim()) {
+        toast.error('Invalid reply data')
+        return
+      }
+
+      setIsReplying(true)
+      console.log('Sending reply:', { postId, commentId, content })
+      
+      const response = await postApi.replyToComment(postId, commentId, content)
+      if (response.success) {
+        // Refresh profile data to get updated comments
+        const profileResponse = await getUserProfile(username!)
+        if (profileResponse?.success) {
+          setProfile(profileResponse as ExtendedUserProfileResponse)
+          setReplyContent('')
+          setReplyingTo(null)
+          toast.success('Reply added successfully')
+        } else {
+          toast.error('Failed to refresh profile data')
+        }
+      } else {
+        toast.error('Failed to add reply')
+      }
+    } catch (error) {
+      console.error('Reply error:', error)
+      if (error instanceof Error) {
+        toast.error(error.message || 'Failed to add reply')
+      } else {
+        toast.error('Failed to add reply')
+      }
+    } finally {
+      setIsReplying(false)
+    }
+  }
+
   const handleReaction = async (postId: string, type: ReactionType) => {
     try {
-      setIsReacting(true)
+      setIsCommenting(true)
       const response = await postApi.addReaction(postId, type)
       if (response.success) {
         // Refresh profile data to get updated reactions
@@ -296,7 +338,7 @@ const Visit = () => {
       console.error('Error adding reaction:', error)
       toast.error('Failed to add reaction')
     } finally {
-      setIsReacting(false)
+      setIsCommenting(false)
     }
   }
 
@@ -539,7 +581,7 @@ const Visit = () => {
                       variant="ghost"
                       onMouseEnter={() => setShowReactionPopover(prev => ({ ...prev, [post.id]: true }))}
                       onClick={() => handleLike(post.id)}
-                      disabled={isLiking || isReacting}
+                      disabled={isLiking || isCommenting}
                     >
                       <ThumbsUp className="mr-1 h-4 w-4" />
                       <span>Like</span>
@@ -570,30 +612,117 @@ const Visit = () => {
                   {/* Comments List */}
                   {post.comments && post.comments.length > 0 && (
                     <div className="space-y-3 mb-4">
-                      {post.comments.map((comment) => (
-                        <div key={comment.id} className="bg-gray-50 p-3 rounded-md">
-                          <div className="flex items-start space-x-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage 
-                                src={getProfileImageUrl(comment.user.profilePicture)} 
-                                alt={comment.user.name} 
-                              />
-                              <AvatarFallback>
-                                {comment.user.name.substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium">{comment.user.name}</span>
-                                <span className="text-sm text-gray-500">
-                                  {format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}
-                                </span>
+                      {post.comments.map((comment) => {
+                        const commentId = (comment._id || comment.id || '').toString();
+                        return (
+                          <div key={commentId} className="bg-gray-50 p-3 rounded-md">
+                            <div className="flex items-start space-x-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage 
+                                  src={getProfileImageUrl(comment.user.profilePicture)} 
+                                  alt={comment.user.name} 
+                                />
+                                <AvatarFallback>
+                                  {comment.user.name.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium">{comment.user.name}</span>
+                                  <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2">
+                                    <span>{format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}</span>
+                                    <button 
+                                      className="text-emerald-600 hover:text-emerald-700 font-medium"
+                                      onClick={() => setReplyingTo(commentId)}
+                                    >
+                                      Reply
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-gray-800 mt-1">{comment.content}</p>
                               </div>
-                              <p className="text-gray-800 mt-1">{comment.content}</p>
                             </div>
+
+                            {/* Replies */}
+                            {comment.replies && comment.replies.length > 0 && (
+                              <div className="ml-6 mt-2 space-y-2">
+                                {comment.replies.map((reply) => {
+                                  const replyId = (reply._id || reply.id || '').toString();
+                                  const replyUser = reply.user;
+                                  
+                                  return (
+                                    <div key={replyId} className="flex items-start space-x-2">
+                                      <Avatar className="h-6 w-6 ring-1 ring-emerald-50">
+                                        <AvatarImage 
+                                          src={getProfileImageUrl(replyUser.profilePicture)} 
+                                          alt={replyUser.name || ''} 
+                                        />
+                                        <AvatarFallback>
+                                          {replyUser.name
+                                            ? replyUser.name.substring(0, 2).toUpperCase() 
+                                            : '..'}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      
+                                      <div className="bg-gray-100 p-2 rounded-md">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <div className="font-semibold text-emerald-700">
+                                            {replyUser.name || ''}
+                                          </div>
+                                          {replyUser.username && (
+                                            <div className="text-xs text-gray-500">@{replyUser.username}</div>
+                                          )}
+                                          <div className="text-xs text-gray-500">
+                                            {format(new Date(reply.createdAt), 'MMM d, yyyy h:mm a')}
+                                          </div>
+                                        </div>
+                                        <div className="text-sm">{reply.content}</div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Reply form */}
+                            {replyingTo && replyingTo === commentId && (
+                              <div className="mt-2 ml-6 flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  {profile?.data.user && (
+                                    <>
+                                      <AvatarImage
+                                        src={getProfileImageUrl(profile.data.user.profilePicture)}
+                                        alt={profile.data.user.name}
+                                      />
+                                      <AvatarFallback>
+                                        {profile.data.user.name.substring(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </>
+                                  )}
+                                </Avatar>
+                                <Textarea
+                                  className="min-h-10 flex-1 text-sm"
+                                  placeholder="Write a reply..."
+                                  value={replyContent}
+                                  onChange={(e) => setReplyContent(e.target.value)}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleReply(post.id, commentId, replyContent)}
+                                  disabled={!replyContent.trim() || isReplying}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  {isReplying ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                                  ) : (
+                                    <Send className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
