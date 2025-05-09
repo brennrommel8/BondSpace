@@ -162,7 +162,7 @@ const PostItem = ({
       case 'sad':
         return '😢';
       case 'angry':
-        return '😠';
+        return '😡';
       default:
         return '👍';
     }

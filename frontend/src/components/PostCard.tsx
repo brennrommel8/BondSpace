@@ -20,21 +20,9 @@ interface PostCardProps {
   onLike: (postId: string) => void;
   onComment: (postId: string, content: string) => void;
   onReply: (postId: string, commentId: string, content: string) => void;
-  onReaction: (postId: string, reactionType: ReactionType) => void;
   isLiking?: boolean;
   isCommenting?: boolean;
-  isReacting?: boolean;
 }
-
-// Emoji map for reaction types
-const reactionIcons: Record<ReactionType, string> = {
-  like: "👍",
-  love: "❤️",
-  haha: "😂",
-  wow: "😮",
-  sad: "😢",
-  angry: "😡"
-};
 
 export const PostCard = ({
   post,
@@ -42,11 +30,10 @@ export const PostCard = ({
   onLike,
   onComment,
   onReply,
-  onReaction,
   isLiking,
-  isCommenting,
-  isReacting
+  isCommenting
 }: PostCardProps) => {
+  // Remove unused variables and functions
   const [comment, setComment] = useState('');
   const [replyContent, setReplyContent] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -54,9 +41,11 @@ export const PostCard = ({
   const [showReactionPopover, setShowReactionPopover] = useState(false);
   const [showReactionDialog, setShowReactionDialog] = useState(false);
   
-  // Use React Query hooks for reactions
+  // Use the useReactions hook at the top level
   const { 
     reactions: postReactions,
+    addReaction: addPostReaction,
+    isAddingReaction: isAddingPostReaction 
   } = useReactions(post._id || post.id || '');
 
   // Store locally known users for display
@@ -584,10 +573,50 @@ export const PostCard = ({
     }
   };
 
-  // Handle reaction to a post
-  const handleReaction = (reactionType: ReactionType) => {
-    const postId = (post._id || post.id || '').toString();
-    onReaction(postId, reactionType);
+  // Find the current user's reaction
+  const userReaction = postReactions?.find(r => 
+    r.user._id === currentUser?._id || 
+    r.user.id === currentUser?._id
+  );
+
+  // Helper function to get reaction emoji
+  const getReactionEmoji = (type: ReactionType) => {
+    switch (type) {
+      case 'like':
+        return '👍';
+      case 'love':
+        return '❤️';
+      case 'haha':
+        return '😂';
+      case 'wow':
+        return '😮';
+      case 'sad':
+        return '😢';
+      case 'angry':
+        return '😡';
+      default:
+        return '👍';
+    }
+  };
+
+  // Helper function to get reaction label
+  const getReactionLabel = (type: ReactionType) => {
+    switch (type) {
+      case 'like':
+        return 'Like';
+      case 'love':
+        return 'Love';
+      case 'haha':
+        return 'Haha';
+      case 'wow':
+        return 'Wow';
+      case 'sad':
+        return 'Sad';
+      case 'angry':
+        return 'Angry';
+      default:
+        return 'Like';
+    }
   };
 
   // Helper function to get profile picture URL
@@ -697,30 +726,6 @@ export const PostCard = ({
     return user;
   };
 
-  // Check if user has liked the post (fallback for when reactions aren't available)
-  const isLikedByUser = currentUser && post.likes && post.likes.some(
-    user => user._id === currentUser._id || user.id === currentUser.id
-  );
-  
-  // Find user's current reaction if any
-  const userReaction = currentUser && (postReactions?.find(
-    reaction => reaction.user._id === currentUser._id || reaction.user.id === currentUser.id
-  ) || (isLikedByUser ? { type: 'like' as ReactionType, user: currentUser } : null));
-  
-  // Determine reaction icon and button variant to show
-  const getReactionIcon = () => {
-    if (!userReaction) return <ThumbsUp className="mr-1 h-4 w-4" />;
-    return <span className="mr-1">{reactionIcons[userReaction.type]}</span>;
-  };
-  
-  // Get reaction text to display
-  const getReactionText = () => {
-    if (!userReaction) return "Like";
-    
-    // Capitalize reaction type
-    return userReaction.type.charAt(0).toUpperCase() + userReaction.type.slice(1);
-  };
-
   return (
     <Card className="mb-4 shadow-sm">
       <CardHeader className="pb-3">
@@ -787,19 +792,23 @@ export const PostCard = ({
               <Button
                 size="sm"
                 variant="ghost"
-                className="px-2 py-1 h-auto min-h-0"
+                className={`px-2 py-1 h-auto min-h-0 ${userReaction ? "text-emerald-600 hover:text-emerald-700" : ""}`}
                 onMouseEnter={() => setShowReactionPopover(true)}
                 onClick={handleLike}
-                disabled={isLiking || isReacting}
+                disabled={isLiking || isAddingPostReaction}
               >
-                {getReactionIcon()}
-                <span className="text-xs">{getReactionText()}</span>
+                {userReaction ? (
+                  <span className="mr-1">{getReactionEmoji(userReaction.type)}</span>
+                ) : (
+                  <ThumbsUp className="mr-1 h-4 w-4" />
+                )}
+                <span className="text-xs">{userReaction ? getReactionLabel(userReaction.type) : "Like"}</span>
               </Button>
               
               <ReactionPopover 
                 isOpen={showReactionPopover}
                 onClose={() => setShowReactionPopover(false)}
-                onReaction={handleReaction}
+                onReaction={(type) => addPostReaction(type)}
               />
             </div>
             
