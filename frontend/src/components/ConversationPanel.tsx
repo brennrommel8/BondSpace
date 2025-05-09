@@ -1360,7 +1360,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
               <div className="mx-auto bg-emerald-100 p-4 rounded-full mb-4 inline-block">
                 <MessageSquare className="h-8 w-8 text-emerald-500" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Your Messages</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Your Messagess</h3>
               <p className="text-gray-600 max-w-md mb-4">
                 Select a conversation from the sidebar or start a new one with your friends.
               </p>
