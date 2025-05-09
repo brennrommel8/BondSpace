@@ -31,7 +31,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster />
+      <Toaster position="top-right" richColors />
       <AuthProvider>
         <AppRoute />
       </AuthProvider>
