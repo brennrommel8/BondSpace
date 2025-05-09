@@ -20,8 +20,10 @@ interface PostCardProps {
   onLike: (postId: string) => void;
   onComment: (postId: string, content: string) => void;
   onReply: (postId: string, commentId: string, content: string) => void;
+  onReaction: (postId: string, reactionType: ReactionType) => void;
   isLiking?: boolean;
   isCommenting?: boolean;
+  isReacting?: boolean;
 }
 
 // Emoji map for reaction types
@@ -40,8 +42,10 @@ export const PostCard = ({
   onLike,
   onComment,
   onReply,
+  onReaction,
   isLiking,
-  isCommenting
+  isCommenting,
+  isReacting
 }: PostCardProps) => {
   const [comment, setComment] = useState('');
   const [replyContent, setReplyContent] = useState('');
@@ -53,8 +57,6 @@ export const PostCard = ({
   // Use React Query hooks for reactions
   const { 
     reactions: postReactions,
-    addReaction: addPostReaction,
-    isAddingReaction: isAddingPostReaction 
   } = useReactions(post._id || post.id || '');
 
   // Store locally known users for display
@@ -582,19 +584,10 @@ export const PostCard = ({
     }
   };
 
-  const handleReaction = (type: ReactionType) => {
+  // Handle reaction to a post
+  const handleReaction = (reactionType: ReactionType) => {
     const postId = (post._id || post.id || '').toString();
-    console.log(`Selected reaction: ${type} for post ${postId}`);
-    
-    // Track whether this is a new reaction or changing an existing one
-    const isChangingExisting = Boolean(userReaction);
-    console.log(`${isChangingExisting ? 'Changing' : 'Adding'} reaction: ${type}`);
-    
-    // Close the reaction popover before sending the request
-    setShowReactionPopover(false);
-    
-    // Use React Query mutation
-    addPostReaction(type);
+    onReaction(postId, reactionType);
   };
 
   // Helper function to get profile picture URL
@@ -797,7 +790,7 @@ export const PostCard = ({
                 className="px-2 py-1 h-auto min-h-0"
                 onMouseEnter={() => setShowReactionPopover(true)}
                 onClick={handleLike}
-                disabled={isLiking || isAddingPostReaction}
+                disabled={isLiking || isReacting}
               >
                 {getReactionIcon()}
                 <span className="text-xs">{getReactionText()}</span>
