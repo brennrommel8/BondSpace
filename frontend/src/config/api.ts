@@ -46,8 +46,14 @@ export const API_ENDPOINTS = {
     ANSWER: (id: string) => `${API_BASE_URL}/api/calls/${id}/answer`,
     REJECT: (id: string) => `${API_BASE_URL}/api/calls/${id}/reject`,
     END: (id: string) => `${API_BASE_URL}/api/calls/${id}/end`,
+  },
+
+  // BondSpace AI endpoints (using Gemini)
+  BONDSPACE: {
+    CHAT: `${API_BASE_URL}/api/gemini/chat`,
+    MODELS: `${API_BASE_URL}/api/gemini/models`
   }
-};
+} as const;
 
 // Log API configuration for debugging
 console.log('API Configuration:', {

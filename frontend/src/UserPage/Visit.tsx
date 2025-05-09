@@ -21,6 +21,8 @@ import {
   DialogContent,
   DialogClose,
 } from "@/components/ui/dialog"
+import { ReplyReactionButton } from '@/components/ui/reply-reaction-button'
+import { ReplyReactionBadge } from '@/components/ui/reply-reaction-badge'
 
 interface ExtendedPost {
   id: string;
@@ -57,6 +59,16 @@ interface ExtendedPost {
         username: string;
         profilePicture: string | { url: string; publicId: string };
       };
+      reactions?: Array<{
+        type: ReactionType;
+        user: {
+          _id: string;
+          id: string;
+          name: string;
+          username: string;
+          profilePicture: string | { url: string; publicId: string };
+        };
+      }>;
     }>;
   }>;
   reactions?: Array<{
@@ -110,6 +122,7 @@ const Visit = () => {
   const [isCommenting, setIsCommenting] = useState(false)
   const [isReplying, setIsReplying] = useState(false)
   const [showProfileImage, setShowProfileImage] = useState(false)
+  const [isReplyReacting, setIsReplyReacting] = useState(false)
   
   // Get friend store state and actions
   const {
@@ -341,6 +354,27 @@ const Visit = () => {
       setIsCommenting(false)
     }
   }
+
+  const handleReplyReaction = async (postId: string, commentId: string, replyId: string, type: ReactionType) => {
+    try {
+      setIsReplyReacting(true);
+      const response = await postApi.addReplyReaction(postId, commentId, replyId, type);
+      if (response.success) {
+        // Refresh profile data to get updated reactions
+        const profileResponse = await getUserProfile(username!);
+        if (profileResponse?.success) {
+          setProfile(profileResponse as ExtendedUserProfileResponse);
+        }
+      } else {
+        toast.error(response.message || 'Failed to add reaction');
+      }
+    } catch (error) {
+      console.error('Error adding reply reaction:', error);
+      toast.error('Failed to add reaction');
+    } finally {
+      setIsReplyReacting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -664,19 +698,50 @@ const Visit = () => {
                                         </AvatarFallback>
                                       </Avatar>
                                       
-                                      <div className="bg-gray-100 p-2 rounded-md">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <div className="font-semibold text-emerald-700">
-                                            {replyUser.name || ''}
+                                      <div className="flex-1">
+                                        <div className="bg-gray-100 p-2 rounded-md">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <div className="font-semibold text-emerald-700">
+                                              {replyUser.name || ''}
+                                            </div>
+                                            {replyUser.username && (
+                                              <div className="text-xs text-gray-500">@{replyUser.username}</div>
+                                            )}
+                                            <div className="text-xs text-gray-500">
+                                              {format(new Date(reply.createdAt), 'MMM d, yyyy h:mm a')}
+                                            </div>
                                           </div>
-                                          {replyUser.username && (
-                                            <div className="text-xs text-gray-500">@{replyUser.username}</div>
-                                          )}
-                                          <div className="text-xs text-gray-500">
-                                            {format(new Date(reply.createdAt), 'MMM d, yyyy h:mm a')}
-                                          </div>
+                                          <div className="text-sm">{reply.content}</div>
                                         </div>
-                                        <div className="text-sm">{reply.content}</div>
+
+                                        {/* Reply Reactions */}
+                                        <div className="flex items-center gap-2 mt-1">
+                                          {/* Display reply reactions badge */}
+                                          {reply.reactions && reply.reactions.length > 0 && (
+                                            <ReplyReactionBadge 
+                                              postId={post.id}
+                                              commentId={commentId}
+                                              replyId={replyId}
+                                              reactions={reply.reactions} 
+                                              showCount={true}
+                                            />
+                                          )}
+
+                                          {/* Reply Reaction Button */}
+                                          <ReplyReactionButton
+                                            postId={post.id}
+                                            commentId={commentId}
+                                            replyId={replyId}
+                                            currentUser={profile?.data.user}
+                                            onReaction={handleReplyReaction}
+                                            userReaction={reply.reactions?.find(r => 
+                                              r.user._id === profile?.data.user._id || 
+                                              r.user.id === profile?.data.user._id
+                                            )}
+                                            isReacting={isReplyReacting}
+                                            reactionCount={reply.reactions?.length || 0}
+                                          />
+                                        </div>
                                       </div>
                                     </div>
                                   );

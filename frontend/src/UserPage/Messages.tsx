@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useUserStore } from '@/store/userStore';
 import ConversationPanel from '@/components/ConversationPanel';
+import BondSpaceAIChat from '@/components/BondSpaceAIChat';
 import { toast } from 'sonner';
 import { useFriendStore } from '@/store/friendStore';
 import { chatApi, IUser } from '@/api/chatApi';
@@ -167,6 +168,32 @@ const Messages: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto p-6 h-[calc(100vh-3.5rem)] bg-white rounded-lg shadow-sm overflow-auto">
         <h2 className="text-2xl font-bold mb-6">Start a Conversation</h2>
+        
+        {/* BondSpaceAI Card */}
+        <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50">
+          <div className="flex items-center">
+            <div className="relative w-12 h-12 mr-3">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl transform rotate-45"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                  <div className="w-3 h-3 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded transform -rotate-45"></div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold">BondSpace AI</h3>
+              <p className="text-sm text-gray-500">Your AI assistant for social connections</p>
+            </div>
+          </div>
+          <Button 
+            className="w-full mt-3 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white"
+            onClick={() => navigate('/messages/bondspace-ai')}
+          >
+            <Users className="mr-2 h-4 w-4" />
+            Chat with AI
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {operationsStatus?.friends?.list?.map(friend => (
             <div 
@@ -228,15 +255,28 @@ const Messages: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Add friends to start conversations with them. Connect with people you know to message them.
           </p>
-          <Button 
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" 
-            onClick={() => navigate('/UserAccount')}
-          >
-            Find Friends
-          </Button>
+          <div className="space-y-3">
+            <Button 
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" 
+              onClick={() => navigate('/UserAccount')}
+            >
+              Find Friends
+            </Button>
+            <Button 
+              className="w-full bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white"
+              onClick={() => navigate('/messages/bondspace-ai')}
+            >
+              Chat with BondSpace AI
+            </Button>
+          </div>
         </div>
       </div>
     );
+  }
+
+  // Handle BondSpaceAI conversation
+  if (conversationId === 'bondspace-ai') {
+    return <BondSpaceAIChat />;
   }
 
   return (

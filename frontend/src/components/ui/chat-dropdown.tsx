@@ -156,6 +156,25 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
             </TabsList>
             
             <TabsContent value="conversations" className="max-h-[calc(70vh-120px)] overflow-y-auto">
+              {/* BondSpace AI Option */}
+              <div 
+                className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
+                onClick={() => navigateWithoutClosing('/messages/bondspace-ai')}
+              >
+                <div className="relative w-10 h-10 mr-3">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl transform rotate-45"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <div className="w-3 h-3 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded transform -rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-900">BondSpace AI</p>
+                  <p className="text-xs text-gray-500">Your AI assistant for social connections</p>
+                </div>
+              </div>
+
               {conversations.map(conversation => {
                 const otherUser = getOtherParticipant(conversation.participants);
                 const isUnread = unreadConversations.has(conversation._id);
@@ -256,6 +275,25 @@ export function ChatDropdown({ isOpen, onClose }: ChatDropdownProps) {
             </TabsList>
             
             <TabsContent value="conversations">
+              {/* BondSpace AI Option */}
+              <div 
+                className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 flex items-center"
+                onClick={() => navigateWithoutClosing('/messages/bondspace-ai')}
+              >
+                <div className="relative w-10 h-10 mr-3">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl transform rotate-45"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <div className="w-3 h-3 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded transform -rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-900">BondSpace AI</p>
+                  <p className="text-xs text-gray-500">Your AI assistant for social connections</p>
+                </div>
+              </div>
+
               <div className="flex flex-col items-center justify-center p-6 text-center h-40">
                 <div className="bg-emerald-100 p-3 rounded-full mb-3">
                   <MessageSquare className="h-6 w-6 text-emerald-500" />
