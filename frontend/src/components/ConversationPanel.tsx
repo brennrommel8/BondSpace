@@ -90,9 +90,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const lastMessageCount = useRef(0);
-  const isManualScrolling = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
@@ -124,54 +121,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       }
     });
   }, [messages]);
-
-  // Function to check if user is near bottom
-  const checkIfNearBottom = () => {
-    if (!messagesContainerRef.current) return false;
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    const threshold = 150; // pixels from bottom
-    return scrollHeight - scrollTop - clientHeight < threshold;
-  };
-
-  // Function to scroll to bottom
-  const scrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      container.scrollTop = container.scrollHeight;
-    }
-  };
-
-  // Handle scroll events
-  const handleScroll = () => {
-    const isAtBottom = checkIfNearBottom();
-    isManualScrolling.current = !isAtBottom;
-  };
-
-  // Set up scroll listener
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
-  }, []);
-
-  // Auto-scroll only when new messages arrive
-  useEffect(() => {
-    const hasNewMessages = messages.length > lastMessageCount.current;
-    if (hasNewMessages) {
-      scrollToBottom();
-    }
-    lastMessageCount.current = messages.length;
-  }, [messages]);
-
-  // Initial scroll to bottom when conversation changes
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
-      isManualScrolling.current = false;
-    }
-  }, [activeConversation?._id]);
 
   // Join/leave conversation room using sockets
   useEffect(() => {
@@ -668,7 +617,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         });
         
         // Scroll to bottom
-        scrollToBottom();
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       } else {
         toast.error(response.error || 'Failed to send message');
       }
@@ -1178,18 +1127,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
             </div>
 
             {/* Messages Area */}
-            <div 
-              ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto bg-white px-4 py-2"
-              style={{ 
-                scrollBehavior: 'smooth',
-                WebkitOverflowScrolling: 'touch',
-                height: 'calc(100vh - 180px)',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
+            <div className="flex-1 p-4 overflow-y-auto bg-white">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-center">
                   <div>
@@ -1203,7 +1141,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4 flex-grow">
+                <div className="space-y-4">
                   {messages.map((message, index) => {
                     const isOwn = isOwnMessage(message);
                     const showDate = index === 0 || 
