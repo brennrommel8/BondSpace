@@ -875,7 +875,12 @@ export const PostCard = ({
                             <CommentReactionButton
                               postId={post._id || post.id || ''}
                               commentId={commentId}
-                              currentUserId={currentUser?._id}
+                              reactions={comment.reactions}
+                              userReaction={comment.reactions?.find(r => 
+                                r.user._id === currentUser?._id || 
+                                r.user.id === currentUser?._id
+                              )}
+                              reactionCount={comment.reactions?.length || 0}
                             />
                           </div>
 
