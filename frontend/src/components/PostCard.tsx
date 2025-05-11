@@ -13,6 +13,7 @@ import { ReactionUsersDialog } from './ui/reaction-users-dialog';
 import { ReplyReactionButton } from './ui/reply-reaction-button';
 import { ReplyReactionBadge } from './ui/reply-reaction-badge';
 import { useReactions } from '@/hooks/useReactions';
+import { CommentReactionButton } from './ui/comment-reaction-button';
 
 interface PostCardProps {
   post: Post;
@@ -869,6 +870,13 @@ export const PostCard = ({
                             >
                               Reply
                             </button>
+                            
+                            {/* Add Comment Reaction Button */}
+                            <CommentReactionButton
+                              postId={post._id || post.id || ''}
+                              commentId={commentId}
+                              currentUserId={currentUser?._id}
+                            />
                           </div>
 
                           {/* Replies */}

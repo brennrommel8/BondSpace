@@ -716,4 +716,53 @@ export const postApi = {
       throw error;
     }
   },
+
+  // Add or update a reaction to a comment
+  reactToComment: async (postId: string, commentId: string, reactionType: ReactionType) => {
+    try {
+      console.log(`Adding reaction ${reactionType} to comment ${commentId} on post ${postId}`);
+      const response = await api.put<ApiResponse<Comment>>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/reactions`,
+        { reactionType },
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      console.log('Reaction response:', response.data);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error adding reaction to comment:', error.response?.data);
+        throw new Error(error.response?.data?.message || 'Failed to add reaction to comment');
+      }
+      throw error;
+    }
+  },
+
+  // Get reactions for a comment
+  getCommentReactions: async (postId: string, commentId: string) => {
+    try {
+      console.log(`Fetching reactions for comment ${commentId} on post ${postId}`);
+      const response = await api.get<ReactionsByTypeResponse>(
+        `${API_ENDPOINTS.API}/posts/${postId}/comments/${commentId}/reactions`,
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      console.log('Comment reactions response:', response.data);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error fetching comment reactions:', error.response?.data);
+        throw new Error(error.response?.data?.message || 'Failed to fetch comment reactions');
+      }
+      throw error;
+    }
+  },
 } 
