@@ -861,11 +861,16 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
 
     const lastActive = new Date(status.lastActive);
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
+    const diffInSeconds = Math.floor((now.getTime() - lastActive.getTime()) / 1000);
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    const diffInHours = Math.floor(diffInMinutes / 60);
 
-    if (diffInMinutes < 1) return 'Just now';
+    if (diffInSeconds < 30) return 'Just now';
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    
+    // For dates older than 24 hours, show the actual date
     return format(lastActive, 'MMM d');
   };
 
