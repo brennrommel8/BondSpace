@@ -979,7 +979,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
         <div className="relative">
           <Avatar className="h-12 w-12 mr-3">
             <AvatarImage 
-              src={getProfileImageUrl(otherUser.profilePicture, otherUser.username)} 
+              src={getProfileImageUrl(otherUser.profilePicture)} 
               username={otherUser.username}
               alt={otherUser.name} 
             />

@@ -86,6 +86,7 @@ interface OnlineUsersResponse {
     id: string;
     name: string;
     username: string;
+    profilePicture: string;
   }>;
 }
 
@@ -201,7 +202,10 @@ export const authApi = {
   // Get user's online status
   getUserStatus: async (userId: string): Promise<UserStatusResponse> => {
     try {
-      const response = await api.get(API_ENDPOINTS.AUTH.USER_STATUS(userId));
+      const url = `${API_ENDPOINTS.API}/auth/user-status/${userId}`;
+      console.log('Fetching user status from:', url);
+      const response = await api.get(url);
+      console.log('User status response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching user status:', error);
@@ -212,7 +216,10 @@ export const authApi = {
   // Get all online users
   getOnlineUsers: async (): Promise<OnlineUsersResponse> => {
     try {
-      const response = await api.get(API_ENDPOINTS.AUTH.ONLINE_USERS);
+      const url = `${API_ENDPOINTS.API}/auth/online-users`;
+      console.log('Fetching online users from:', url);
+      const response = await api.get(url);
+      console.log('Online users response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching online users:', error);
