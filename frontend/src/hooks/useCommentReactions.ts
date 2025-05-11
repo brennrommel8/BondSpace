@@ -92,11 +92,21 @@ export const useCommentReactions = (
     },
   });
 
+  // Create a default reactionsByType object with empty arrays for each reaction type
+  const defaultReactionsByType: Record<ReactionType, Reaction[]> = {
+    like: [],
+    love: [],
+    haha: [],
+    wow: [],
+    sad: [],
+    angry: []
+  };
+
   return {
     isLoading,
     error: error ? (error as Error).message : null,
     reactions: data?.data?.reactions || [],
-    reactionsByType: data?.data?.byType || {} as Record<ReactionType, Reaction[]>,
+    reactionsByType: data?.data?.byType || defaultReactionsByType,
     totalCount: data?.data?.totalCount || 0,
     addReaction: async (type: ReactionType) => {
       return new Promise((resolve, reject) => {
