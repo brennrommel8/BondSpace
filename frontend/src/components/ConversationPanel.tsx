@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { chatApi, Conversation, Message as ApiMessage, Media } from '@/api/chatApi';
+import { authApi } from '@/api/authApi';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '@/store/userStore';
@@ -17,7 +18,10 @@ import {
   onTypingIndicator,
   onMessageRead,
   onMessageDeleted,
-  sendMessageDeletionNotification
+  sendMessageDeletionNotification,
+  onUserOnline,
+  onUserOffline,
+  onUserStatusUpdate
 } from '@/utils/socketUtils';
 import useSocket from '@/hooks/useSocket';
 import { getProfileImageUrl, preloadProfilePictures } from '@/utils/profileImageUtils';
@@ -69,6 +73,12 @@ interface MessageDeletedData {
   messageId: string;
 }
 
+interface UserStatus {
+  userId: string;
+  isOnline: boolean;
+  lastActive: string;
+}
+
 const TypingIndicator: React.FC = () => {
   return (
     <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-2 w-16">
@@ -81,7 +91,7 @@ const TypingIndicator: React.FC = () => {
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, userId }) => {
   const { user } = useUserStore();
-  const { isConnected, onlineUsers, forceReconnect, initializeSocketConnection } = useSocket();
+  const { isConnected, forceReconnect, initializeSocketConnection } = useSocket();
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationData | null>(null);
@@ -101,6 +111,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     updateConversationUnreadCount,
   } = useMessageStore();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [userStatuses, setUserStatuses] = useState<Map<string, UserStatus>>(new Map());
   
   // Preload profile pictures for all participants
   useEffect(() => {
@@ -756,127 +767,254 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
     );
   };
 
-  // Check if user is online
+  // Fetch initial online users and set up status tracking
+  useEffect(() => {
+    const fetchOnlineUsers = async () => {
+      try {
+        const response = await authApi.getOnlineUsers();
+        if (response.success) {
+          // Initialize userStatuses with online users
+          const initialStatuses = new Map<string, UserStatus>();
+          response.users.forEach(user => {
+            initialStatuses.set(user.id, {
+              userId: user.id,
+              isOnline: true,
+              lastActive: new Date().toISOString()
+            });
+          });
+          setUserStatuses(initialStatuses);
+        }
+      } catch (error) {
+        console.error('Error fetching online users:', error);
+      }
+    };
+
+    fetchOnlineUsers();
+  }, []);
+
+  // Update user status when socket events occur
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const handleUserOnline = async (userId: string) => {
+      try {
+        // Fetch the user's current status
+        const response = await authApi.getUserStatus(userId);
+        if (response.success) {
+          setUserStatuses(prev => {
+            const newMap = new Map(prev);
+            newMap.set(userId, response.status);
+            return newMap;
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user status:', error);
+      }
+    };
+
+    const handleUserOffline = async (userId: string) => {
+      try {
+        // Fetch the user's current status
+        const response = await authApi.getUserStatus(userId);
+        if (response.success) {
+          setUserStatuses(prev => {
+            const newMap = new Map(prev);
+            newMap.set(userId, response.status);
+            return newMap;
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user status:', error);
+      }
+    };
+
+    const handleUserStatusUpdate = async (status: UserStatus) => {
+      setUserStatuses(prev => {
+        const newMap = new Map(prev);
+        newMap.set(status.userId, status);
+        return newMap;
+      });
+    };
+
+    // Set up event listeners
+    const onlineCleanup = onUserOnline(handleUserOnline);
+    const offlineCleanup = onUserOffline(handleUserOffline);
+    const statusUpdateCleanup = onUserStatusUpdate(handleUserStatusUpdate);
+
+    return () => {
+      onlineCleanup();
+      offlineCleanup();
+      statusUpdateCleanup();
+    };
+  }, [isConnected]);
+
+  // Update isUserOnline function to use the new status system
   const isUserOnline = (userId: string): boolean => {
-    console.log('Checking if user is online:', userId, 'Online users:', Array.from(onlineUsers));
-    return onlineUsers.has(userId);
+    const status = userStatuses.get(userId);
+    return status?.isOnline || false;
   };
 
-  // Check for online status changes
-  useEffect(() => {
-    console.log('Online users changed:', Array.from(onlineUsers));
-  }, [onlineUsers]);
+  // Get user's last active time
+  const getUserLastActive = (userId: string): string => {
+    const status = userStatuses.get(userId);
+    if (!status) return '';
 
-  // Render conversation list with online status indicators
-  const renderConversations = () => {
-    return conversations.map(conversation => {
-      const otherUser = getOtherParticipant(conversation);
-      const isActive = activeConversation?._id === conversation._id;
-      const isOnline = isUserOnline(otherUser._id);
-      const isUnread = !isActive && conversation.unreadCount > 0;
-      const unreadCount = conversation.unreadCount || 0;
+    const lastActive = new Date(status.lastActive);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
 
-      // Format the last message preview
-      const getLastMessagePreview = () => {
-        if (!conversation.lastMessage) {
-          return 'No messages yet';
-        }
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return format(lastActive, 'MMM d');
+  };
 
-        if (conversation.lastMessage.deleted) {
-          return 'This message was deleted';
-        }
+  // Update the conversation header to show last active time
+  const renderConversationHeader = () => {
+    if (!activeConversation) return null;
 
-        if (conversation.lastMessage.media && conversation.lastMessage.media.length > 0) {
-          const mediaCount = conversation.lastMessage.media.length;
-          const mediaType = conversation.lastMessage.media[0].mediaType;
-          return `${mediaCount} ${mediaType}${mediaCount > 1 ? 's' : ''}`;
-        }
+    const otherUser = getOtherParticipant(activeConversation);
+    const isOnline = isUserOnline(otherUser._id);
+    const lastActive = getUserLastActive(otherUser._id);
 
-        if (conversation.lastMessage.content) {
-          // Truncate long messages
-          return conversation.lastMessage.content.length > 30
-            ? conversation.lastMessage.content.substring(0, 30) + '...'
-            : conversation.lastMessage.content;
-        }
-
-        return 'No messages yet';
-      };
-
-      // Format the last message time
-      const getLastMessageTime = () => {
-        if (!conversation.lastMessage) {
-          return '';
-        }
-
-        const messageDate = new Date(conversation.lastMessage.createdAt);
-        const now = new Date();
-        const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
-
-        if (diffInHours < 24) {
-          return formatTime(conversation.lastMessage.createdAt);
-        } else if (diffInHours < 48) {
-          return 'Yesterday';
-        } else {
-          return format(messageDate, 'MMM d');
-        }
-      };
-
-      // Get the sender prefix for the last message
-      const getLastMessagePrefix = () => {
-        if (!conversation.lastMessage) return '';
-        
-        const isOwnMessage = conversation.lastMessage.sender._id === userId;
-        return isOwnMessage ? 'You: ' : '';
-      };
-
-      return (
-        <div 
-          key={conversation._id}
-          className={`flex items-center p-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${
-            isActive ? 'bg-emerald-50' : ''
-          } ${isUnread ? 'bg-blue-50' : ''}`}
-          onClick={() => selectConversation(conversation)}
-        >
-          <div className="relative">
-            <Avatar className="h-12 w-12 mr-3">
+    return (
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-emerald-50">
+        <div className="flex items-center">
+          {!showConversationList && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="mr-2 md:hidden h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-100 rounded-full"
+              onClick={() => setShowConversationList(true)}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          )}
+          
+          <div 
+            className="flex items-center cursor-pointer"
+            onClick={() => {
+              if (activeConversation.unreadCount === 0) {
+                navigate(`/profile/${otherUser._id}`);
+              }
+            }}
+          >
+            <Avatar className="h-9 w-9 mr-2">
               <AvatarImage 
-                src={getProfileImageUrl(otherUser.profilePicture, otherUser.username)} 
-                username={otherUser.username}
+                src={getProfileImageUrl(otherUser.profilePicture)} 
                 alt={otherUser.name} 
               />
-              <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
+              <AvatarFallback>
+                {otherUser.name.charAt(0)}
+              </AvatarFallback>
             </Avatar>
-            {isUnread && unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-            {isOnline && (
-              <span className="absolute bottom-0 right-1 bg-emerald-500 w-3 h-3 rounded-full border-2 border-white"></span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-center mb-1">
-              <p className={`font-medium truncate ${isUnread ? 'text-blue-600' : 'text-gray-900'}`}>
+            <div>
+              <div className="font-medium text-sm flex items-center">
                 {otherUser.name}
-              </p>
-              <p className={`text-xs ${isUnread ? 'text-blue-500' : 'text-gray-500'} ml-2 whitespace-nowrap`}>
-                {getLastMessageTime()}
-              </p>
-            </div>
-            <div className="flex items-center">
-              <p className={`text-sm truncate ${isUnread ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-                <span className="text-gray-500">{getLastMessagePrefix()}</span>
-                {getLastMessagePreview()}
-              </p>
-              {isUnread && (
-                <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>
-              )}
+                {isOnline && (
+                  <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500"></span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {isOnline ? 'Online' : `Last seen ${lastActive}`}
+              </div>
             </div>
           </div>
         </div>
-      );
-    });
+      </div>
+    );
+  };
+
+  // Update the conversation list item to show last active time
+  const renderConversationItem = (conversation: ConversationData) => {
+    const otherUser = getOtherParticipant(conversation);
+    const isActive = activeConversation?._id === conversation._id;
+    const isOnline = isUserOnline(otherUser._id);
+    const lastActive = getUserLastActive(otherUser._id);
+    const isUnread = !isActive && conversation.unreadCount > 0;
+    const unreadCount = conversation.unreadCount || 0;
+
+    // Format the last message preview
+    const getLastMessagePreview = () => {
+      if (!conversation.lastMessage) {
+        return 'No messages yet';
+      }
+
+      if (conversation.lastMessage.deleted) {
+        return 'This message was deleted';
+      }
+
+      if (conversation.lastMessage.media && conversation.lastMessage.media.length > 0) {
+        const mediaCount = conversation.lastMessage.media.length;
+        const mediaType = conversation.lastMessage.media[0].mediaType;
+        return `${mediaCount} ${mediaType}${mediaCount > 1 ? 's' : ''}`;
+      }
+
+      if (conversation.lastMessage.content) {
+        // Truncate long messages
+        return conversation.lastMessage.content.length > 30
+          ? conversation.lastMessage.content.substring(0, 30) + '...'
+          : conversation.lastMessage.content;
+      }
+
+      return 'No messages yet';
+    };
+
+    // Get the sender prefix for the last message
+    const getLastMessagePrefix = () => {
+      if (!conversation.lastMessage) return '';
+      
+      const isOwnMessage = conversation.lastMessage.sender._id === userId;
+      return isOwnMessage ? 'You: ' : '';
+    };
+
+    return (
+      <div 
+        key={conversation._id}
+        className={`flex items-center p-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${
+          isActive ? 'bg-emerald-50' : ''
+        } ${isUnread ? 'bg-blue-50' : ''}`}
+        onClick={() => selectConversation(conversation)}
+      >
+        <div className="relative">
+          <Avatar className="h-12 w-12 mr-3">
+            <AvatarImage 
+              src={getProfileImageUrl(otherUser.profilePicture, otherUser.username)} 
+              username={otherUser.username}
+              alt={otherUser.name} 
+            />
+            <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          {isUnread && unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+          {isOnline && (
+            <span className="absolute bottom-0 right-1 bg-emerald-500 w-3 h-3 rounded-full border-2 border-white"></span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center mb-1">
+            <p className={`font-medium truncate ${isUnread ? 'text-blue-600' : 'text-gray-900'}`}>
+              {otherUser.name}
+            </p>
+            <p className={`text-xs ${isUnread ? 'text-blue-500' : 'text-gray-500'} ml-2 whitespace-nowrap`}>
+              {isOnline ? 'Online' : lastActive}
+            </p>
+          </div>
+          <div className="flex items-center">
+            <p className={`text-sm truncate ${isUnread ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              <span className="text-gray-500">{getLastMessagePrefix()}</span>
+              {getLastMessagePreview()}
+            </p>
+            {isUnread && (
+              <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Update handleInputChange
@@ -1063,7 +1201,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
-            {renderConversations()}
+            {conversations.map(renderConversationItem)}
           </div>
         )}
       </div>
@@ -1074,57 +1212,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversationId, u
       } md:flex flex-col w-full md:w-2/3 lg:w-3/4 bg-white`}>
         {activeConversation ? (
           <>
-            {/* Conversation Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-emerald-50">
-              <div className="flex items-center">
-                {/* Back button on mobile */}
-                {!showConversationList && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="mr-2 md:hidden h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-100 rounded-full"
-                    onClick={() => setShowConversationList(true)}
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                )}
-                
-                {/* User info */}
-                <div 
-                  className="flex items-center cursor-pointer"
-                  onClick={() => {
-                    const otherUser = getOtherParticipant(activeConversation);
-                    // Only navigate if there are no unread messages
-                    if (activeConversation.unreadCount === 0) {
-                      navigate(`/profile/${otherUser._id}`);
-                    }
-                  }}
-                >
-                  <Avatar className="h-9 w-9 mr-2">
-                    <AvatarImage 
-                      src={getProfileImageUrl(getOtherParticipant(activeConversation).profilePicture)} 
-                      alt={getOtherParticipant(activeConversation).name} 
-                    />
-                    <AvatarFallback>
-                      {getOtherParticipant(activeConversation).name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-medium text-sm flex items-center">
-                      {getOtherParticipant(activeConversation).name}
-                      {isUserOnline(getOtherParticipant(activeConversation)._id) && (
-                        <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500"></span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {isUserOnline(getOtherParticipant(activeConversation)._id) 
-                        ? 'Online' 
-                        : 'Offline'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {renderConversationHeader()}
 
             {/* Messages Area */}
             <div className="flex-1 p-4 overflow-y-auto bg-white">

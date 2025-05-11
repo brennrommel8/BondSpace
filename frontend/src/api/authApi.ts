@@ -2,6 +2,7 @@ import api from '@/config/axios';
 import axios from 'axios';
 import { API_ENDPOINTS } from '@/config/api';
 
+
 export interface SignUpData {
   name: string
   username: string
@@ -66,6 +67,26 @@ interface ChangePasswordInput {
   currentPassword: string;
   newPassword: string;
   confirmNewPassword: string;
+}
+
+// Interface for user status response
+interface UserStatusResponse {
+  success: boolean;
+  status: {
+    userId: string;
+    isOnline: boolean;
+    lastActive: string;
+  };
+}
+
+// Interface for online users response
+interface OnlineUsersResponse {
+  success: boolean;
+  users: Array<{
+    id: string;
+    name: string;
+    username: string;
+  }>;
 }
 
 export const authApi = {
@@ -176,4 +197,28 @@ export const authApi = {
   // logout: async () => { ... },
   // refreshToken: async () => { ... },
   // forgotPassword: async (email: string) => { ... },
+
+  // Get user's online status
+  getUserStatus: async (userId: string): Promise<UserStatusResponse> => {
+    try {
+      const response = await api.get(API_ENDPOINTS.AUTH.USER_STATUS(userId));
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user status:', error);
+      throw error;
+    }
+  },
+
+  // Get all online users
+  getOnlineUsers: async (): Promise<OnlineUsersResponse> => {
+    try {
+      const response = await api.get(API_ENDPOINTS.AUTH.ONLINE_USERS);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching online users:', error);
+      throw error;
+    }
+  },
 }
+
+export default authApi;

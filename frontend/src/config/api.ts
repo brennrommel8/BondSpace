@@ -21,6 +21,8 @@ export const API_ENDPOINTS = {
     LOGOUT: `${API_BASE_URL}/api/auth/logout`,
     VERIFY: `${API_BASE_URL}/api/auth/verify`,
     REFRESH: `${API_BASE_URL}/api/auth/refresh`,
+    USER_STATUS: (userId: string) => `${API_BASE_URL}/api/users/${userId}/status`,
+    ONLINE_USERS: `${API_BASE_URL}/api/users/online`,
   },
   
   // User endpoints

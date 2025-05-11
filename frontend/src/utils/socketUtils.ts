@@ -476,6 +476,18 @@ export const onUserOffline = (callback: (userId: string) => void): () => void =>
   return () => {};
 };
 
+// Listen for user status updates
+export const onUserStatusUpdate = (callback: (status: { userId: string; isOnline: boolean; lastActive: string }) => void): () => void => {
+  const s = getSafeSocket();
+  if (s) {
+    s.on('userStatusUpdate', callback);
+    return () => {
+      s.off('userStatusUpdate', callback);
+    };
+  }
+  return () => {};
+};
+
 // Send typing indicator
 export const sendTypingIndicator = (
   conversationId: string,
