@@ -60,10 +60,10 @@ export interface Post {
   comments: Comment[]
   createdAt: string
   updatedAt?: string
-  media?: {
-    type: string | null
+  media?: Array<{
+    type: string
     url: string
-  }
+  }>
   visibility?: 'public' | 'friends'
 }
 

@@ -34,29 +34,51 @@ export const useReactions = (postId: string): UseReactionsReturn => {
       // Snapshot the previous value
       const previousReactions = queryClient.getQueryData(['post-reactions', postId]);
 
+      // Get current user from localStorage
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (!currentUser._id) {
+        throw new Error('User not authenticated');
+      }
+
       // Optimistically update to the new value
       queryClient.setQueryData(['post-reactions', postId], (old: any) => {
         const currentReactions = old?.data?.reactions || [];
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const currentByType = old?.data?.byType || {};
         
         // Remove any existing reaction from the current user
         const filteredReactions = currentReactions.filter(
           (r: Reaction) => r.user._id !== currentUser._id && r.user.id !== currentUser._id
         );
 
-        // Add the new reaction
+        // Create new reaction
+        const newReaction: Reaction = {
+          type: newReactionType,
+          user: currentUser,
+          createdAt: new Date().toISOString()
+        };
+
+        // Update reactions array
+        const updatedReactions = [...filteredReactions, newReaction];
+
+        // Update byType object
+        const updatedByType = { ...currentByType };
+        Object.keys(updatedByType).forEach(type => {
+          updatedByType[type] = updatedByType[type].filter(
+            (r: Reaction) => r.user._id !== currentUser._id && r.user.id !== currentUser._id
+          );
+        });
+        if (!updatedByType[newReactionType]) {
+          updatedByType[newReactionType] = [];
+        }
+        updatedByType[newReactionType].push(newReaction);
+
         return {
           ...old,
           data: {
             ...old?.data,
-            reactions: [
-              ...filteredReactions,
-              {
-                type: newReactionType,
-                user: currentUser,
-                createdAt: new Date().toISOString()
-              }
-            ]
+            reactions: updatedReactions,
+            byType: updatedByType,
+            totalCount: updatedReactions.length
           }
         };
       });

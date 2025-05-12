@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dialog"
 import { ReplyReactionButton } from '@/components/ui/reply-reaction-button'
 import { ReplyReactionBadge } from '@/components/ui/reply-reaction-badge'
+import { CommentReactionButton } from '@/components/ui/comment-reaction-button'
+import { CommentReactionBadge } from '@/components/ui/comment-reaction-badge'
 
 interface ExtendedPost {
   id: string;
@@ -50,6 +52,16 @@ interface ExtendedPost {
       username: string;
       profilePicture: string | { url: string; publicId: string };
     };
+    reactions?: Array<{
+      type: ReactionType;
+      user: {
+        _id: string;
+        id: string;
+        name: string;
+        username: string;
+        profilePicture: string | { url: string; publicId: string };
+      };
+    }>;
     replies: Array<{
       id: string;
       _id?: string;
@@ -313,7 +325,31 @@ const PostItem = ({
                               >
                                 Reply
                               </button>
+                              
+                              {/* Add Comment Reaction Button */}
+                              <CommentReactionButton
+                                postId={post.id}
+                                commentId={commentId}
+                                reactions={comment.reactions}
+                                userReaction={comment.reactions?.find(r => 
+                                  r.user._id === profile?.data.user._id || 
+                                  r.user.id === profile?.data.user._id
+                                )}
+                                reactionCount={comment.reactions?.length || 0}
+                              />
                             </div>
+
+                            {/* Display comment reactions badge if any */}
+                            {comment.reactions && comment.reactions.length > 0 && (
+                              <div className="mt-1">
+                                <CommentReactionBadge 
+                                  postId={post.id}
+                                  commentId={commentId}
+                                  reactions={comment.reactions}
+                                  showCount={true}
+                                />
+                              </div>
+                            )}
                           </div>
                           <p className="text-gray-800 mt-1">{comment.content}</p>
                         </div>

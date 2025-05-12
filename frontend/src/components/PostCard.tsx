@@ -14,6 +14,8 @@ import { ReplyReactionButton } from './ui/reply-reaction-button';
 import { ReplyReactionBadge } from './ui/reply-reaction-badge';
 import { useReactions } from '@/hooks/useReactions';
 import { CommentReactionButton } from './ui/comment-reaction-button';
+import { useQueryClient } from '@tanstack/react-query';
+import { ImageSlider } from '@/components/ui/image-slider';
 
 interface PostCardProps {
   post: Post;
@@ -51,6 +53,9 @@ export const PostCard = ({
 
   // Store locally known users for display
   const [commentUsers, setCommentUsers] = useState<Record<string, User>>({});
+
+  // Prefetch comment reactions when comments are shown
+  const queryClient = useQueryClient();
 
   // Helper function to create a fallback user
   const createFallbackUser = (userId: string): User => {
@@ -488,6 +493,25 @@ export const PostCard = ({
     fetchCommentsWithUserData();
   }, [showComments, post._id, currentUser]);
 
+  // Prefetch comment reactions when comments are shown
+  useEffect(() => {
+    if (showComments && post.comments) {
+      const postId = post._id || post.id || '';
+      if (!postId) return;
+
+      post.comments.forEach(comment => {
+        const commentId = (comment._id || comment.id || '').toString();
+        if (commentId) {
+          // Prefetch reactions for each comment
+          queryClient.prefetchQuery({
+            queryKey: ['comment-reactions', postId, commentId],
+            queryFn: () => postApi.getCommentReactions(postId, commentId)
+          });
+        }
+      });
+    }
+  }, [showComments, post.comments, post._id, post.id, queryClient]);
+
   const handleLike = () => {
     const postId = (post._id || post.id || '').toString();
     
@@ -752,24 +776,22 @@ export const PostCard = ({
       </CardHeader>
       <CardContent className="pt-0 pb-2">
         <div className="whitespace-pre-wrap mb-2">{post.content || ''}</div>
-        {post.media && post.media.url && (
-          <div className="mt-3 rounded-md overflow-hidden">
-            {post.media.type === 'image' ? (
-              <img 
-                src={post.media.url} 
-                alt="Post media" 
-                className="w-full h-auto object-cover rounded-md max-h-[500px]"
-                loading="lazy"
+        {post.media && post.media.length > 0 && (
+          <div className="mb-4">
+            {post.media[0].type === 'image' ? (
+              <ImageSlider
+                images={post.media.filter((item: { type: string; url: string }) => 
+                  item.type === 'image'
+                )}
+                className="w-full"
               />
-            ) : post.media.type === 'video' ? (
-              <video 
-                src={post.media.url}
-                className="w-full h-auto object-cover rounded-md max-h-[500px]"
+            ) : post.media[0].type === 'video' ? (
+              <video
+                src={post.media[0].url}
                 controls
-                preload="metadata"
+                className="w-full h-auto rounded-lg"
                 playsInline
               >
-                <source src={post.media.url} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             ) : null}

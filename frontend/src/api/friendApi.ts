@@ -8,7 +8,7 @@ export interface FriendResponse {
   data?: any
   count?: number
 }
-
+0
 export interface Friend {
   _id: string
   name: string

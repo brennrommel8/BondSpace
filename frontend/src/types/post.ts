@@ -30,16 +30,75 @@ export interface Comment {
 }
 
 export interface Post {
-  _id: string;
-  id?: string;
+  id: string;
+  _id?: string;
   content: string;
-  user: User;
   createdAt: string;
-  media?: {
+  user: {
+    name: string;
+    username: string;
+    profilePicture: string | { url: string; publicId: string };
+  };
+  likes: Array<{
+    name: string;
+    username: string;
+    profilePicture: string | { url: string; publicId: string };
+  }>;
+  comments: Array<{
+    id: string;
+    _id?: string;
+    content: string;
+    createdAt: string;
+    user: {
+      name: string;
+      username: string;
+      profilePicture: string | { url: string; publicId: string };
+    };
+    reactions?: Array<{
+      type: ReactionType;
+      user: {
+        _id: string;
+        id: string;
+        name: string;
+        username: string;
+        profilePicture: string | { url: string; publicId: string };
+      };
+    }>;
+    replies: Array<{
+      id: string;
+      _id?: string;
+      content: string;
+      createdAt: string;
+      user: {
+        name: string;
+        username: string;
+        profilePicture: string | { url: string; publicId: string };
+      };
+      reactions?: Array<{
+        type: ReactionType;
+        user: {
+          _id: string;
+          id: string;
+          name: string;
+          username: string;
+          profilePicture: string | { url: string; publicId: string };
+        };
+      }>;
+    }>;
+  }>;
+  reactions?: Array<{
+    type: ReactionType;
+    user: {
+      _id: string;
+      id: string;
+      name: string;
+      username: string;
+      profilePicture: string | { url: string; publicId: string };
+    };
+  }>;
+  media: Array<{
     type: 'image' | 'video';
     url: string;
-  };
-  likes?: User[];
-  reactions?: Reaction[];
-  comments?: Comment[];
+    publicId?: string;
+  }>;
 } 
