@@ -8,16 +8,21 @@ import { User } from '@/api/postApi';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { toast } from 'sonner';
 
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video';
+}
+
 interface CreatePostFormProps {
   currentUser: User | null;
-  onSubmit: (content: string, mediaFile?: File) => void;
+  onSubmit: (content: string, mediaFiles: MediaFile[]) => void;
   isSubmitting: boolean;
 }
 
 export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePostFormProps) => {
   const [content, setContent] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,30 +37,43 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
       return user.profilePicture;
     }
     
-    // Handle object format
     if (user.profilePicture && typeof user.profilePicture === 'object') {
       if ('url' in user.profilePicture && user.profilePicture.url) {
         return user.profilePicture.url;
       }
     }
     
-    // Default fallback
     return user ? `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}` : '';
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (content.trim()) {
-      onSubmit(content, mediaFile || undefined);
+    if (content.trim() || mediaFiles.length > 0) {
+      onSubmit(content, mediaFiles);
       setContent('');
-      setMediaFile(null);
-      setMediaPreview(null);
+      setMediaFiles([]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    
+    // Check if adding these files would exceed the limit
+    if (mediaFiles.length + files.length > 6) {
+      toast.error('You can only upload up to 5 images and 1 video');
+      return;
+    }
+
+    // Check if there's already a video
+    const hasVideo = mediaFiles.some(mf => mf.type === 'video');
+    const newVideo = files.find(file => file.type.startsWith('video/'));
+    
+    if (hasVideo && newVideo) {
+      toast.error('You can only upload one video per post');
+      return;
+    }
+
+    files.forEach(file => {
       // Check file size (500MB limit)
       if (file.size > 500 * 1024 * 1024) {
         toast.error('File size must be less than 500MB');
@@ -67,28 +85,32 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
         toast.error('Please select an image or video file');
         return;
       }
+
+      // Check if we already have 5 images and trying to add another image
+      const imageCount = mediaFiles.filter(mf => mf.type === 'image').length;
+      if (file.type.startsWith('image/') && imageCount >= 5) {
+        toast.error('You can only upload up to 5 images');
+        return;
+      }
       
       // Create a preview
       const reader = new FileReader();
       reader.onloadend = () => {
-        setMediaPreview(reader.result as string);
+        setMediaFiles(prev => [...prev, {
+          file,
+          preview: reader.result as string,
+          type: file.type.startsWith('image/') ? 'image' : 'video'
+        }]);
       };
       reader.readAsDataURL(file);
-      
-      setMediaFile(file);
-    }
+    });
   };
 
-  const handleRemoveMedia = () => {
-    setMediaFile(null);
-    setMediaPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleRemoveMedia = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
-    // Insert emoji at current cursor position or at the end
     const emoji = emojiData.emoji;
     const textarea = textareaRef.current;
     
@@ -103,18 +125,15 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
       
       setContent(newContent);
       
-      // Focus back on textarea and set cursor position after the inserted emoji
       setTimeout(() => {
         textarea.focus();
         const newCursorPos = start + emoji.length;
         textarea.setSelectionRange(newCursorPos, newCursorPos);
       }, 10);
     } else {
-      // If no ref, just append to the end
       setContent(prevContent => prevContent + emoji);
     }
     
-    // Close emoji picker after selection
     setShowEmojiPicker(false);
   };
 
@@ -144,33 +163,37 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
                 rows={3}
               />
               
-              {/* Media preview */}
-              {mediaPreview && (
-                <div className="relative mt-3 rounded-md overflow-hidden">
-                  {mediaFile?.type.startsWith('image/') ? (
-                    <img 
-                      src={mediaPreview} 
-                      alt="Preview" 
-                      className="w-full h-auto object-cover rounded-md max-h-[300px]" 
-                    />
-                  ) : mediaFile?.type.startsWith('video/') ? (
-                    <video 
-                      src={mediaPreview}
-                      className="w-full h-auto object-cover rounded-md max-h-[300px]"
-                      controls
-                      preload="metadata"
-                    >
-                      <source src={mediaPreview} type={mediaFile.type} />
-                      Your browser does not support the video tag.
-                    </video>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={handleRemoveMedia}
-                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+              {/* Media preview grid */}
+              {mediaFiles.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {mediaFiles.map((media, index) => (
+                    <div key={index} className="relative rounded-md overflow-hidden">
+                      {media.type === 'image' ? (
+                        <img 
+                          src={media.preview} 
+                          alt={`Preview ${index + 1}`} 
+                          className="w-full h-32 object-cover rounded-md" 
+                        />
+                      ) : (
+                        <video 
+                          src={media.preview}
+                          className="w-full h-32 object-cover rounded-md"
+                          controls
+                          preload="metadata"
+                        >
+                          <source src={media.preview} type={media.file.type} />
+                          Your browser does not support the video tag.
+                        </video>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia(index)}
+                        className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -199,13 +222,14 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
               onChange={handleFileChange}
               className="hidden"
               id="media-upload"
+              multiple
             />
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || mediaFiles.length >= 6}
             >
               <Image className="h-4 w-4 mr-2" />
               Add Media
@@ -224,7 +248,7 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
           <Button
             type="submit"
             className="bg-emerald-500 hover:bg-emerald-600"
-            disabled={!content.trim() || isSubmitting}
+            disabled={(!content.trim() && mediaFiles.length === 0) || isSubmitting}
           >
             {isSubmitting ? 'Posting...' : 'Post'}
             <Send className="ml-2 h-4 w-4" />

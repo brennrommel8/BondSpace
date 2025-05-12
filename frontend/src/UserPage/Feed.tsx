@@ -6,6 +6,12 @@ import { User } from '@/api/postApi';
 import { authApi } from '@/api/authApi';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video';
+}
+
 const Feed = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +78,8 @@ const Feed = () => {
     fetchCurrentUser();
   }, [queryClient]);
 
-  const handleCreatePost = (content: string, mediaFile?: File) => {
-    createPost({ content, mediaFile });
+  const handleCreatePost = (content: string, mediaFiles: MediaFile[]) => {
+    createPost({ content, mediaFiles });
   };
 
   const handleLike = (postId: string) => {

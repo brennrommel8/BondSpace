@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postApi, Post, ReactionType, User } from '@/api/postApi';
 import { toast } from 'sonner';
 
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video';
+}
+
 export const usePostQueries = () => {
   const queryClient = useQueryClient();
 
@@ -18,8 +24,8 @@ export const usePostQueries = () => {
 
   // Create post mutation
   const createPostMutation = useMutation({
-    mutationFn: ({ content, mediaFile }: { content: string; mediaFile?: File }) => 
-      postApi.createPost(content, mediaFile),
+    mutationFn: ({ content, mediaFiles }: { content: string; mediaFiles: MediaFile[] }) => 
+      postApi.createPost(content, mediaFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       toast.success('Post created successfully');

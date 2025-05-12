@@ -19,13 +19,13 @@ export const ImageSlider = ({ images, className }: ImageSliderProps) => {
   if (images.length === 0) return null;
 
   return (
-    <div className={cn('relative group max-w-3xl mx-auto', className)}>
+    <div className={cn('relative group w-full h-full', className)}>
       {/* Main Image */}
-      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg">
+      <div className="relative w-full flex justify-center items-center overflow-auto rounded-lg bg-gray-50">
         <img
           src={images[currentIndex].url}
           alt={`Post image ${currentIndex + 1}`}
-          className="w-full h-full object-contain bg-gray-50"
+          className="object-contain max-w-full max-h-full mx-auto my-auto"
         />
       </div>
 
@@ -80,4 +80,4 @@ export const ImageSlider = ({ images, className }: ImageSliderProps) => {
       )}
     </div>
   );
-}; 
+};

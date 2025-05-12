@@ -148,6 +148,12 @@ export const normalizeUser = (user: any): User => {
   };
 };
 
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video';
+}
+
 export const postApi = {
   // Track users that failed to load (to avoid repeated 404 requests)
   _failedUserIds: new Set<string>(tempFailedUserIds),
@@ -324,15 +330,20 @@ export const postApi = {
   },
 
   // Create a new post
-  createPost: async (content: string, mediaFile?: File): Promise<PostResponse> => {
+  createPost: async (content: string, mediaFiles: MediaFile[]): Promise<PostResponse> => {
     try {
       let response;
       
-      if (mediaFile) {
-        // If there's a media file, use FormData
+      if (mediaFiles && mediaFiles.length > 0) {
+        // If there are media files, use FormData
         const formData = new FormData();
         formData.append('content', content);
-        formData.append('media', mediaFile);
+        
+        // Append each media file with its type
+        mediaFiles.forEach((mediaFile) => {
+          formData.append(`media`, mediaFile.file);
+          formData.append(`mediaTypes`, mediaFile.type);
+        });
         
         response = await api.post<PostResponse>(
           `${API_ENDPOINTS.API}/posts`,
