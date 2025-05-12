@@ -139,7 +139,7 @@ const Messages: React.FC = () => {
           <div className="bg-emerald-100 p-3 rounded-full mb-3 inline-block">
             <LogIn className="h-6 w-6 text-emerald-500" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Sign in Requiredd</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Sign in Required</h2>
           <p className="text-gray-600 mb-6">
             Please sign in to view and send messages. Create an account to connect with friends and start conversations.
           </p>
