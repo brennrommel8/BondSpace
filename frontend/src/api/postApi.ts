@@ -339,10 +339,23 @@ export const postApi = {
         const formData = new FormData();
         formData.append('content', content);
         
-        // Append each media file with its type
+        // Create mediaItems array with just the type
+        const mediaItems = mediaFiles.map((mediaFile) => ({
+          type: mediaFile.type
+        }));
+        
+        // Append mediaItems as JSON string
+        formData.append('mediaItems', JSON.stringify(mediaItems));
+        
+        // Append each media file with a unique key
         mediaFiles.forEach((mediaFile) => {
-          formData.append(`media`, mediaFile.file);
-          formData.append(`mediaTypes`, mediaFile.type);
+          formData.append(`mediaFiles`, mediaFile.file);
+        });
+        
+        console.log('Sending FormData:', {
+          content,
+          mediaItems,
+          fileCount: mediaFiles.length
         });
         
         response = await api.post<PostResponse>(
@@ -352,6 +365,13 @@ export const postApi = {
             withCredentials: true,
             headers: {
               'Content-Type': 'multipart/form-data',
+            },
+            // Add timeout for large files
+            timeout: 30000, // 30 seconds
+            // Add upload progress tracking
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+              console.log(`Upload progress: ${percentCompleted}%`);
             }
           }
         );

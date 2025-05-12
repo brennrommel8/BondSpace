@@ -92,17 +92,55 @@ export const CreatePostForm = ({ currentUser, onSubmit, isSubmitting }: CreatePo
         toast.error('You can only upload up to 5 images');
         return;
       }
-      
-      // Create a preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaFiles(prev => [...prev, {
-          file,
-          preview: reader.result as string,
-          type: file.type.startsWith('image/') ? 'image' : 'video'
-        }]);
-      };
-      reader.readAsDataURL(file);
+
+      // For videos, check duration and size
+      if (file.type.startsWith('video/')) {
+        // Create a video element to check duration
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        
+        video.onloadedmetadata = () => {
+          // Check video duration (5 minutes limit)
+          if (video.duration > 300) {
+            toast.error('Video must be less than 5 minutes');
+            return;
+          }
+          
+          // Check video size (500MB limit)
+          if (file.size > 500 * 1024 * 1024) {
+            toast.error('Video size must be less than 500MB');
+            return;
+          }
+          
+          // Create preview
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setMediaFiles(prev => [...prev, {
+              file,
+              preview: reader.result as string,
+              type: 'video'
+            }]);
+          };
+          reader.readAsDataURL(file);
+        };
+        
+        video.onerror = () => {
+          toast.error('Error loading video file');
+        };
+        
+        video.src = URL.createObjectURL(file);
+      } else {
+        // For images, create preview directly
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setMediaFiles(prev => [...prev, {
+            file,
+            preview: reader.result as string,
+            type: 'image'
+          }]);
+        };
+        reader.readAsDataURL(file);
+      }
     });
   };
 
