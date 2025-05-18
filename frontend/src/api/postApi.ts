@@ -351,7 +351,7 @@ export const postApi = {
         formData.append('mediaItems', JSON.stringify(mediaItems));
         
         // Append each media file with a unique key
-        mediaFiles.forEach((mediaFile, index) => {
+        mediaFiles.forEach((mediaFile) => {
           formData.append(`mediaFiles`, mediaFile.file);
         });
         
