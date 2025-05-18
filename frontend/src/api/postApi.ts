@@ -355,10 +355,13 @@ export const postApi = {
           formData.append(`mediaFiles`, mediaFile.file);
         });
         
-        console.log('Sending FormData:', {
+        // Log the FormData contents for debugging
+        console.log('FormData contents:', {
           content,
           mediaItems,
-          fileCount: mediaFiles.length
+          fileCount: mediaFiles.length,
+          fileTypes: mediaFiles.map(f => f.file.type),
+          fileSizes: mediaFiles.map(f => f.file.size)
         });
         
         response = await api.post<PostResponse>(
@@ -370,7 +373,7 @@ export const postApi = {
               'Content-Type': 'multipart/form-data',
             },
             // Add timeout for large files
-            timeout: 30000, // 30 seconds
+            timeout: 60000, // Increase timeout to 60 seconds
             // Add upload progress tracking
             onUploadProgress: (progressEvent) => {
               const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
@@ -395,9 +398,47 @@ export const postApi = {
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('Create post error details:', error.response?.data);
+        // Enhanced error logging
+        console.error('Create post error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.response?.headers,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            headers: error.config?.headers,
+            data: error.config?.data
+          }
+        });
+        
+        // More specific error messages based on status code
+        if (error.response?.status === 400) {
+          throw new Error(error.response.data?.message || 'Invalid request data. Please check your input.');
+        } else if (error.response?.status === 413) {
+          throw new Error('File size too large. Please reduce the size of your media files.');
+        } else if (error.response?.status === 415) {
+          throw new Error('Unsupported media type. Please check your file formats.');
+        } else if (error.response?.status === 401) {
+          throw new Error('Authentication required. Please sign in again.');
+        } else if (error.response?.status === 403) {
+          throw new Error('You do not have permission to create posts.');
+        } else if (error.response?.status === 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+        
         throw new Error(error.response?.data?.message || 'Failed to create post');
       }
+      
+      // Handle network errors
+      if (error instanceof Error) {
+        if (error.message.includes('Network Error')) {
+          throw new Error('Network error. Please check your internet connection.');
+        } else if (error.message.includes('timeout')) {
+          throw new Error('Request timed out. Please try again.');
+        }
+      }
+      
       throw error;
     }
   },
