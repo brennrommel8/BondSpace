@@ -339,16 +339,19 @@ export const postApi = {
         const formData = new FormData();
         formData.append('content', content);
         
-        // Create mediaItems array with just the type
+        // Create mediaItems array with more information
         const mediaItems = mediaFiles.map((mediaFile) => ({
-          type: mediaFile.type
+          type: mediaFile.type,
+          fileName: mediaFile.file.name,
+          fileType: mediaFile.file.type,
+          fileSize: mediaFile.file.size
         }));
         
         // Append mediaItems as JSON string
         formData.append('mediaItems', JSON.stringify(mediaItems));
         
         // Append each media file with a unique key
-        mediaFiles.forEach((mediaFile) => {
+        mediaFiles.forEach((mediaFile, index) => {
           formData.append(`mediaFiles`, mediaFile.file);
         });
         
